@@ -4,6 +4,7 @@ import {
   CreateProductInput,
   UpdateProductInput,
 } from "@/types/product";
+import { Category, CreateCategoryInput, UpdateCategoryInput } from "@/types/category";
 
 const API_BASE_URL = "http://localhost:5000"; // your backend
 
@@ -43,7 +44,7 @@ api.interceptors.response.use(
       }
     }
     return Promise.reject(error);
-  },
+  }
 );
 
 // Auth API
@@ -65,7 +66,7 @@ export const productsApi = {
     const response = await api.get("/products");
     return response.data;
   },
-  getById: async (id: string): Promise<Product> => {
+  getById: async (id: number): Promise<Product> => {
     const response = await api.get(`/products/${id}`);
     return response.data;
   },
@@ -73,19 +74,140 @@ export const productsApi = {
     const response = await api.post("/products", data);
     return response.data;
   },
-  update: async (id: string, data: UpdateProductInput): Promise<Product> => {
+  update: async (id: number, data: UpdateProductInput): Promise<Product> => {
     const response = await api.patch(`/products/${id}`, data);
     return response.data;
   },
   patch: async (
-    id: string,
-    data: Partial<UpdateProductInput>,
+    id: number,
+    data: Partial<UpdateProductInput>
   ): Promise<Product> => {
     const response = await api.patch(`/products/${id}`, data);
     return response.data;
   },
-  delete: async (id: string): Promise<void> => {
+  delete: async (id: number): Promise<void> => {
     await api.delete(`/products/${id}`);
+  },
+};
+
+// Categories API with fake data
+const fakeCategories: Category[] = [
+  {
+    id: 1,
+    name: "Fashion",
+    isActive: true,
+    productCount: 45,
+    createdAt: "2024-01-15T10:00:00Z",
+    updatedAt: "2024-03-20T14:30:00Z",
+  },
+  {
+    id: 2,
+    name: "Electronics",
+    isActive: true,
+    productCount: 128,
+    createdAt: "2024-01-15T10:00:00Z",
+    updatedAt: "2024-03-18T09:15:00Z",
+  },
+  {
+    id: 3,
+    name: "Home & Living",
+    isActive: true,
+    productCount: 67,
+    createdAt: "2024-02-01T08:00:00Z",
+    updatedAt: "2024-03-15T11:45:00Z",
+  },
+  {
+    id: 4,
+    name: "Sports & Outdoors",
+    isActive: false,
+    productCount: 23,
+    createdAt: "2024-02-10T12:00:00Z",
+    updatedAt: "2024-03-10T16:20:00Z",
+  },
+  {
+    id: 5,
+    name: "Beauty & Personal Care",
+    isActive: true,
+    productCount: 89,
+    createdAt: "2024-02-15T09:30:00Z",
+    updatedAt: "2024-03-22T10:00:00Z",
+  },
+];
+
+// Simulate API delay
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export const categoriesApi = {
+  // Get all categories
+  getAll: async (): Promise<Category[]> => {
+    await delay(500); // Simulate network delay
+    return [...fakeCategories];
+  },
+
+  // Get category by ID
+  getById: async (id: number): Promise<Category> => {
+    await delay(300);
+    const category = fakeCategories.find((c) => c.id === id);
+    if (!category) {
+      throw new Error("Category not found");
+    }
+    return { ...category };
+  },
+
+  // Create new category
+  create: async (data: CreateCategoryInput): Promise<Category> => {
+    await delay(500);
+    const newCategory: Category = {
+      id: Math.max(...fakeCategories.map((c) => c.id)) + 1,
+      name: data.name,
+      isActive: data.isActive,
+      productCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    fakeCategories.push(newCategory);
+    return newCategory;
+  },
+
+  // Update category
+  update: async (id: number, data: UpdateCategoryInput): Promise<Category> => {
+    await delay(400);
+    const index = fakeCategories.findIndex((c) => c.id === id);
+    if (index === -1) {
+      throw new Error("Category not found");
+    }
+    fakeCategories[index] = {
+      ...fakeCategories[index],
+      name: data.name ?? fakeCategories[index].name,
+      isActive: data.isActive ?? fakeCategories[index].isActive,
+      updatedAt: new Date().toISOString(),
+    };
+    return fakeCategories[index];
+  },
+
+  // Delete category
+  delete: async (id: number): Promise<void> => {
+    await delay(300);
+    const index = fakeCategories.findIndex((c) => c.id === id);
+    if (index === -1) {
+      throw new Error("Category not found");
+    }
+    fakeCategories.splice(index, 1);
+  },
+
+  // Toggle category active status
+  toggleActive: async (id: number): Promise<Category> => {
+    await delay(300);
+    const index = fakeCategories.findIndex((c) => c.id === id);
+    if (index === -1) {
+      throw new Error("Category not found");
+    }
+    fakeCategories[index] = {
+      ...fakeCategories[index],
+      isActive: !fakeCategories[index].isActive,
+      updatedAt: new Date().toISOString(),
+    };
+    return fakeCategories[index];
   },
 };
 
