@@ -3,6 +3,7 @@ import { AdminNavbar } from "@/components/layout/AdminNavbar";
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
 import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
+import path from "path";
 
 export default function AdminLayout({
   children,
@@ -22,7 +23,7 @@ export default function AdminLayout({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
-          className="p-6"
+          className={`${pathname === "/admin/login" ? "p-0" : "p-8"} `}
         >
           {children}
         </motion.main>
