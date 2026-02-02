@@ -10,6 +10,7 @@ import {
   Package,
   ChevronDown,
   ChevronUp,
+  CornerDownRight,
 } from "lucide-react";
 import { useCategories } from "@/hooks/useCategories";
 import { PageTransition, FadeIn } from "@/components/ui/motion";
@@ -47,7 +48,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { TableSkeleton } from "@/components/ui/skeleton-card";
 import { useToast } from "@/hooks/use-toast";
 import { CreateCategoryInput } from "@/types/category";
@@ -58,14 +58,13 @@ const CategoriesPage = () => {
     isLoading,
     createCategory,
     deleteCategory,
-    toggleCategoryActive,
   } = useCategories();
   const [searchQuery, setSearchQuery] = useState("");
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
-  const [newCategoryActive, setNewCategoryActive] = useState(true);
-  const [newSubcategories, setNewSubcategories] = useState<string>("");
+  const [newSlug, setNewSlug] = useState("");
+  const [newParentId, setNewParentId] = useState<number | null>(null);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<number | null>(null);
@@ -74,9 +73,28 @@ const CategoriesPage = () => {
 
   const { toast } = useToast();
 
+  // Helper function to generate slug from name
+  const generateSlug = (name: string): string => {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/[\s_-]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  };
+
+  // Get top-level categories (those without a parent)
+  const topLevelCategories = categories.filter((cat) => cat.parentId === null);
+
+  // Filter categories based on search
   const filteredCategories = categories.filter((category) =>
     category.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Helper to get full category data (including _count) from the main array
+  const getFullCategoryData = (id: number) => {
+    return categories.find((c) => c.id === id);
+  };
 
   const handleCreateCategory = async () => {
     if (!newCategoryName.trim()) {
@@ -88,19 +106,20 @@ const CategoriesPage = () => {
       return;
     }
 
-    try {
-      const subcategories = newSubcategories
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
+    if (!newSlug.trim()) {
+      toast({
+        title: "Error",
+        description: "Category slug is required",
+        variant: "destructive",
+      });
+      return;
+    }
 
+    try {
       const input: CreateCategoryInput = {
         name: newCategoryName,
-        isActive: newCategoryActive,
-        subcategories:
-          subcategories.length > 0
-            ? subcategories.map((name) => ({ name }))
-            : undefined,
+        slug: newSlug,
+        parentId: newParentId,
       };
 
       await createCategory(input);
@@ -110,8 +129,8 @@ const CategoriesPage = () => {
       });
       setCreateDialogOpen(false);
       setNewCategoryName("");
-      setNewCategoryActive(true);
-      setNewSubcategories("");
+      setNewSlug("");
+      setNewParentId(null);
     } catch (error) {
       console.log(error);
       toast({
@@ -149,29 +168,106 @@ const CategoriesPage = () => {
     setCategoryToDelete(null);
   };
 
-  const handleToggleActive = async (id: number) => {
-    try {
-      const category = categories.find((c) => c.id === id);
-      await toggleCategoryActive(id);
-      toast({
-        title: "Category updated",
-        description: `${category?.name} is now ${
-          !category?.isActive ? "active" : "inactive"
-        }`,
-      });
-    } catch (error) {
-      console.log(error);
-      toast({
-        title: "Error",
-        description: "Failed to update category status",
-        variant: "destructive",
-      });
-    }
-  };
-
   const getCategoryToDelete = () => {
     if (!categoryToDelete) return null;
     return categories.find((c) => c.id === categoryToDelete);
+  };
+
+  const renderCategoryRow = (categoryId: number, level = 0) => {
+    const category = getFullCategoryData(categoryId);
+    if (!category) return null;
+    
+    const hasChildren = category.children && category.children.length > 0;
+    const isExpanded = expandedCategory === category.id;
+    const productCount = category._count?.products || 0;
+
+    return (
+      <AnimatePresence key={category.id} mode="popLayout">
+        <motion.tr
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          className="border-b last:border-0 hover:bg-muted/30 transition-colors"
+        >
+          <TableCell>
+            <div
+              className="flex items-center gap-3"
+              style={{ paddingLeft: `${level * 24 + 12}px` }}
+            >
+              {hasChildren ? (
+                <button
+                  onClick={() =>
+                    setExpandedCategory(isExpanded ? null : category.id)
+                  }
+                  className="p-1 hover:bg-muted rounded"
+                >
+                  {isExpanded ? (
+                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </button>
+              ) : (
+                <div className="w-5" />
+              )}
+              {level > 0 && (
+                <CornerDownRight className="w-4 h-4 text-muted-foreground" />
+              )}
+              <div
+                className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  level > 0 ? "bg-muted/50" : "bg-accent/10"
+                }`}
+              >
+                <FolderTree className={`w-5 h-5 ${level > 0 ? "text-muted-foreground" : "text-accent"}`} />
+              </div>
+              <div>
+                <p className="font-medium">{category.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  {category.parent ? (
+                    <span className="flex items-center gap-1">
+                      <CornerDownRight className="w-3 h-3" />
+                      Subcategory of {category.parent.name}
+                    </span>
+                  ) : (
+                    `Created ${new Date(category.createdAt).toLocaleDateString()}`
+                  )}
+                </p>
+              </div>
+            </div>
+          </TableCell>
+          <TableCell>
+            <span className="text-sm text-muted-foreground">{category.slug}</span>
+          </TableCell>
+          <TableCell>
+            <div className="flex items-center gap-2">
+              <Package className="w-4 h-4 text-muted-foreground" />
+              <span className="font-medium">{productCount}</span>
+            </div>
+          </TableCell>
+          <TableCell className="text-right">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => handleDeleteClick(category.id)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
+        </motion.tr>
+        {hasChildren && isExpanded && (
+          category.children.map((child) => renderCategoryRow(child.id, level + 1))
+        )}
+      </AnimatePresence>
+    );
   };
 
   return (
@@ -242,90 +338,16 @@ const CategoriesPage = () => {
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead>Category Name</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Slug</TableHead>
                     <TableHead>Products</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   <AnimatePresence mode="popLayout">
-                    {filteredCategories.map((category, index) => (
-                      <motion.tr
-                        key={category.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="border-b last:border-0 hover:bg-muted/30 transition-colors"
-                      >
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={() =>
-                                setExpandedCategory(
-                                  expandedCategory === category.id
-                                    ? null
-                                    : category.id
-                                )
-                              }
-                              className="p-1 hover:bg-muted rounded"
-                            >
-                              {expandedCategory === category.id ? (
-                                <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                              ) : (
-                                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                              )}
-                            </button>
-                            <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
-                              <FolderTree className="w-5 h-5 text-accent" />
-                            </div>
-                            <div>
-                              <p className="font-medium">{category.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                Created{" "}
-                                {new Date(
-                                  category.createdAt
-                                ).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={category.isActive}
-                            onCheckedChange={() =>
-                              handleToggleActive(category.id)
-                            }
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Package className="w-4 h-4 text-muted-foreground" />
-                            <span className="font-medium">
-                              {category.productCount}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => handleDeleteClick(category.id)}
-                                className="text-destructive focus:text-destructive"
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </motion.tr>
-                    ))}
+                    {topLevelCategories.map((category) =>
+                      renderCategoryRow(category.id)
+                    )}
                   </AnimatePresence>
                 </TableBody>
               </Table>
@@ -347,33 +369,50 @@ const CategoriesPage = () => {
                 id="categoryName"
                 placeholder="Enter category name"
                 value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  setNewCategoryName(name);
+                  // Auto-generate slug from name if slug is empty or was auto-generated
+                  if (!newSlug || newSlug === generateSlug(newCategoryName)) {
+                    setNewSlug(generateSlug(name));
+                  }
+                }}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="subcategories">Subcategories (Optional)</Label>
+              <Label htmlFor="categorySlug">Slug</Label>
               <Input
-                id="subcategories"
-                placeholder="Enter subcategories separated by comma (for future use)"
-                value={newSubcategories}
-                onChange={(e) => setNewSubcategories(e.target.value)}
+                id="categorySlug"
+                placeholder="category-slug"
+                value={newSlug}
+                onChange={(e) => setNewSlug(e.target.value)}
               />
               <p className="text-sm text-muted-foreground">
-                Separate subcategories with commas (e.g., Men, Women, Kids)
+                URL-friendly identifier (auto-generated from name)
               </p>
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="categoryActive">Active</Label>
-                <p className="text-sm text-muted-foreground">
-                  Make this category visible to customers
-                </p>
-              </div>
-              <Switch
-                id="categoryActive"
-                checked={newCategoryActive}
-                onCheckedChange={setNewCategoryActive}
-              />
+            <div className="space-y-2">
+              <Label htmlFor="parentCategory">Parent Category (Optional)</Label>
+              <select
+                id="parentCategory"
+                className="w-full px-3 py-2 border rounded-md bg-background"
+                value={newParentId || ""}
+                onChange={(e) =>
+                  setNewParentId(e.target.value ? Number(e.target.value) : null)
+                }
+              >
+                <option value="">None (Top-level category)</option>
+                {categories
+                  .filter((cat) => cat.parentId === null)
+                  .map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+              </select>
+              <p className="text-sm text-muted-foreground">
+                Select a parent category to create a subcategory
+              </p>
             </div>
           </div>
           <DialogFooter>
@@ -401,12 +440,12 @@ const CategoriesPage = () => {
             <AlertDialogDescription>
               Are you sure you want to delete this category? This action cannot
               be undone.
-              {getCategoryToDelete()?.productCount !== undefined &&
-                getCategoryToDelete()?.productCount !== null &&
-                getCategoryToDelete()!.productCount > 0 && (
+              {getCategoryToDelete()?._count?.products !== undefined &&
+                getCategoryToDelete()?._count?.products !== null &&
+                getCategoryToDelete()!._count!.products > 0 && (
                   <p className="mt-2 text-destructive">
                     Warning: This category has{" "}
-                    {getCategoryToDelete()?.productCount} products associated
+                    {getCategoryToDelete()?._count?.products} products associated
                     with it.
                   </p>
                 )}

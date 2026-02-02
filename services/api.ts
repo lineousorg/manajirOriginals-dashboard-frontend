@@ -90,136 +90,35 @@ export const productsApi = {
   },
 };
 
-// Categories API with fake data
-const fakeCategories: Category[] = [
-  {
-    id: 1,
-    name: "Fashion",
-    slug: "fashion",
-    isActive: true,
-    parentId: null,
-    productCount: 45,
-    createdAt: "2024-01-15T10:00:00Z",
-    updatedAt: "2024-03-20T14:30:00Z",
-  },
-  {
-    id: 2,
-    name: "Electronics",
-    slug: "electronics",
-    isActive: true,
-    parentId: null,
-    productCount: 128,
-    createdAt: "2024-01-15T10:00:00Z",
-    updatedAt: "2024-03-18T09:15:00Z",
-  },
-  {
-    id: 3,
-    name: "Home & Living",
-    slug: "home-living",
-    isActive: true,
-    parentId: null,
-    productCount: 67,
-    createdAt: "2024-02-01T08:00:00Z",
-    updatedAt: "2024-03-15T11:45:00Z",
-  },
-  {
-    id: 4,
-    name: "Sports & Outdoors",
-    slug: "sports-outdoors",
-    isActive: false,
-    parentId: null,
-    productCount: 23,
-    createdAt: "2024-02-10T12:00:00Z",
-    updatedAt: "2024-03-10T16:20:00Z",
-  },
-  {
-    id: 5,
-    name: "Beauty & Personal Care",
-    slug: "beauty-personal-care",
-    isActive: true,
-    parentId: null,
-    productCount: 89,
-    createdAt: "2024-02-15T09:30:00Z",
-    updatedAt: "2024-03-22T10:00:00Z",
-  },
-];
-
-// Simulate API delay
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
+// Categories API
 export const categoriesApi = {
   // Get all categories
   getAll: async (): Promise<Category[]> => {
-    await delay(500); // Simulate network delay
-    return [...fakeCategories];
+    const response = await api.get("/categories");
+    return response.data.data;
   },
 
   // Get category by ID
   getById: async (id: number): Promise<Category> => {
-    await delay(300);
-    const category = fakeCategories.find((c) => c.id === id);
-    if (!category) {
-      throw new Error("Category not found");
-    }
-    return { ...category };
+    const response = await api.get(`/categories/${id}`);
+    return response.data.data;
   },
 
   // Create new category
   create: async (data: CreateCategoryInput): Promise<Category> => {
-    await delay(500);
-    const newCategory: Category = {
-      id: Math.max(...fakeCategories.map((c) => c.id)) + 1,
-      name: data.name,
-      slug: data.name.toLowerCase().replace(/\s+/g, "-"),
-      isActive: data.isActive,
-      parentId: null,
-      productCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    fakeCategories.push(newCategory);
-    return newCategory;
+    const response = await api.post("/categories", data);
+    return response.data.data;
   },
 
   // Update category
   update: async (id: number, data: UpdateCategoryInput): Promise<Category> => {
-    await delay(400);
-    const index = fakeCategories.findIndex((c) => c.id === id);
-    if (index === -1) {
-      throw new Error("Category not found");
-    }
-    fakeCategories[index] = {
-      ...fakeCategories[index],
-      name: data.name ?? fakeCategories[index].name,
-      isActive: data.isActive ?? fakeCategories[index].isActive,
-      updatedAt: new Date().toISOString(),
-    };
-    return fakeCategories[index];
+    const response = await api.patch(`/categories/${id}`, data);
+    return response.data.data;
   },
 
   // Delete category
   delete: async (id: number): Promise<void> => {
-    await delay(300);
-    const index = fakeCategories.findIndex((c) => c.id === id);
-    if (index === -1) {
-      throw new Error("Category not found");
-    }
-    fakeCategories.splice(index, 1);
-  },
-
-  // Toggle category active status
-  toggleActive: async (id: number): Promise<Category> => {
-    await delay(300);
-    const index = fakeCategories.findIndex((c) => c.id === id);
-    if (index === -1) {
-      throw new Error("Category not found");
-    }
-    fakeCategories[index] = {
-      ...fakeCategories[index],
-      isActive: !fakeCategories[index].isActive,
-      updatedAt: new Date().toISOString(),
-    };
-    return fakeCategories[index];
+    await api.delete(`/categories/${id}`);
   },
 };
 
