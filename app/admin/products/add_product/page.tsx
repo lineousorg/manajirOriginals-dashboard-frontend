@@ -107,13 +107,26 @@ const CreateProductPage = () => {
         description: `${data.name} has been created successfully.`,
       });
       router.push("/admin/products");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating product:", error);
-      toast({
-        title: "Error",
-        description: "Failed to create product. Please try again.",
-        variant: "destructive",
-      });
+
+      // Check for 409 Conflict (duplicate slug)
+      if (error?.response?.status === 409) {
+        toast({
+          title: "Slug Already Exists",
+          description:
+            "Product with this slug already exists. Please use a different slug.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description:
+            error?.response?.data?.message ||
+            "Failed to create product. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 

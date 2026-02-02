@@ -34,6 +34,7 @@ export const useProducts = () => {
     setError(null);
     try {
       const created = await productsApi.create(data);
+      console.log(data);
       setProducts((prev) => [...prev, created]);
       return created;
     } catch (err: any) {
