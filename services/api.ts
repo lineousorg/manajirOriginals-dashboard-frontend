@@ -64,26 +64,26 @@ export const authApi = {
 export const productsApi = {
   getAll: async (): Promise<Product[]> => {
     const response = await api.get("/products");
-    return response.data;
+    return response.data.data;
   },
   getById: async (id: number): Promise<Product> => {
     const response = await api.get(`/products/${id}`);
-    return response.data;
+    return response.data.data;
   },
   create: async (data: CreateProductInput): Promise<Product> => {
     const response = await api.post("/products", data);
-    return response.data;
+    return response.data.data;
   },
   update: async (id: number, data: UpdateProductInput): Promise<Product> => {
     const response = await api.patch(`/products/${id}`, data);
-    return response.data;
+    return response.data.data;
   },
   patch: async (
     id: number,
     data: Partial<UpdateProductInput>
   ): Promise<Product> => {
     const response = await api.patch(`/products/${id}`, data);
-    return response.data;
+    return response.data.data;
   },
   delete: async (id: number): Promise<void> => {
     await api.delete(`/products/${id}`);
@@ -95,7 +95,9 @@ const fakeCategories: Category[] = [
   {
     id: 1,
     name: "Fashion",
+    slug: "fashion",
     isActive: true,
+    parentId: null,
     productCount: 45,
     createdAt: "2024-01-15T10:00:00Z",
     updatedAt: "2024-03-20T14:30:00Z",
@@ -103,7 +105,9 @@ const fakeCategories: Category[] = [
   {
     id: 2,
     name: "Electronics",
+    slug: "electronics",
     isActive: true,
+    parentId: null,
     productCount: 128,
     createdAt: "2024-01-15T10:00:00Z",
     updatedAt: "2024-03-18T09:15:00Z",
@@ -111,7 +115,9 @@ const fakeCategories: Category[] = [
   {
     id: 3,
     name: "Home & Living",
+    slug: "home-living",
     isActive: true,
+    parentId: null,
     productCount: 67,
     createdAt: "2024-02-01T08:00:00Z",
     updatedAt: "2024-03-15T11:45:00Z",
@@ -119,7 +125,9 @@ const fakeCategories: Category[] = [
   {
     id: 4,
     name: "Sports & Outdoors",
+    slug: "sports-outdoors",
     isActive: false,
+    parentId: null,
     productCount: 23,
     createdAt: "2024-02-10T12:00:00Z",
     updatedAt: "2024-03-10T16:20:00Z",
@@ -127,7 +135,9 @@ const fakeCategories: Category[] = [
   {
     id: 5,
     name: "Beauty & Personal Care",
+    slug: "beauty-personal-care",
     isActive: true,
+    parentId: null,
     productCount: 89,
     createdAt: "2024-02-15T09:30:00Z",
     updatedAt: "2024-03-22T10:00:00Z",
@@ -160,7 +170,9 @@ export const categoriesApi = {
     const newCategory: Category = {
       id: Math.max(...fakeCategories.map((c) => c.id)) + 1,
       name: data.name,
+      slug: data.name.toLowerCase().replace(/\s+/g, "-"),
       isActive: data.isActive,
+      parentId: null,
       productCount: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

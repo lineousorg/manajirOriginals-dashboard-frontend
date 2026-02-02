@@ -1,37 +1,72 @@
-export interface ProductVariant {
-  id?: number;
-  productId?: number;
-  size: string;
-  color: string;
-  price: number;
-  stock: number;
+// Product category interface (nested in Product)
+export interface ProductCategory {
+  id: number;
+  name: string;
+  slug: string;
+  parentId: number | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
+// Product variant attribute interface
+export interface VariantAttribute {
+  attributeId: number;
+  valueId: number;
+}
+
+// Product variant interface (matches API response)
+export interface ProductVariant {
+  id: number;
+  sku: string;
+  price: number;
+  stock: number;
+  productId: number;
+  attributes: VariantAttribute[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Main Product interface (matches API response)
 export interface Product {
   id: number;
   name: string;
+  slug: string;
   description: string;
-  price: number;
-  categoryId: number;
-  isFeatured: boolean;
-  isBest?: boolean;
+  brand: string | null;
   isActive: boolean;
+  categoryId: number;
+  category: ProductCategory;
   variants: ProductVariant[];
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
+// Input types for creating/updating products
 export interface CreateProductInput {
   name: string;
+  slug: string;
   description: string;
-  price: number;
   categoryId: number;
-  isFeatured: boolean;
-  isBest?: boolean;
-  isActive: boolean;
-  variants: Omit<ProductVariant, "id">[];
+  variants: CreateVariantInput[];
+}
+
+export interface CreateVariantInput {
+  sku: string;
+  price: number;
+  stock: number;
+  attributes: VariantAttribute[];
 }
 
 export interface UpdateProductInput extends Partial<CreateProductInput> {
-  variants?: ProductVariant[];
+  variants?: CreateVariantInput[];
 }
+
+// API Response wrapper types
+export type ApiResponse<T> = {
+  message: string;
+  status: "success" | "error";
+  data: T;
+};
+
+export type ProductsApiResponse = ApiResponse<Product[]>;
+export type ProductApiResponse = ApiResponse<Product>;

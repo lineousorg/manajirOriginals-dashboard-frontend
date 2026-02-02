@@ -1,7 +1,9 @@
 export interface Category {
   id: number;
   name: string;
+  slug: string;
   isActive: boolean;
+  parentId: number | null;
   productCount: number;
   subcategories?: SubCategory[];
   createdAt: string;

@@ -11,6 +11,7 @@ import {
   Package,
 } from "lucide-react";
 import { useProducts } from "@/hooks/useProducts";
+import { useCategories } from "@/hooks/useCategories";
 import { Product } from "@/types/product";
 import { PageTransition, FadeIn } from "@/components/ui/motion";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -50,10 +56,10 @@ import { StatusBadge } from "@/components/ui/badge-status";
 import { TableSkeleton } from "@/components/ui/skeleton-card";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
-import { categories } from "./add_product/page";
 
 const ProductsPage = () => {
   const { products, isLoading, deleteProduct } = useProducts();
+  const { categories } = useCategories();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<number | "all">("all");
 
@@ -103,6 +109,8 @@ const ProductsPage = () => {
     return Object.fromEntries(categories.map((cat) => [cat.id, cat.name]));
   }, []);
 
+  console.log(filteredProducts);
+
   return (
     <PageTransition>
       <div className="space-y-6">
@@ -137,7 +145,7 @@ const ProductsPage = () => {
               setCategoryFilter(value === "all" ? "all" : Number(value))
             }
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-45">
               <Filter className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Category" />
             </SelectTrigger>
@@ -186,9 +194,9 @@ const ProductsPage = () => {
                   <TableRow className="bg-muted/50">
                     <TableHead>Product</TableHead>
                     <TableHead>Category</TableHead>
-                    <TableHead>Price</TableHead>
+                    <TableHead>Brand</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Flags</TableHead>
+                    <TableHead>Variants</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -210,7 +218,7 @@ const ProductsPage = () => {
                             </div>
                             <div>
                               <p className="font-medium">{product.name}</p>
-                              <p className="text-sm text-muted-foreground truncate max-w-[200px]">
+                              <p className="text-sm text-muted-foreground truncate max-w-50">
                                 {product.description}
                               </p>
                             </div>
@@ -218,28 +226,63 @@ const ProductsPage = () => {
                         </TableCell>
                         <TableCell>
                           <span className="text-sm">
-                            {categoryMap[product.categoryId] ?? "Unknown"}
+                            {product?.category.name}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">
+                            {product.brand ?? "-"}
                           </span>
                         </TableCell>
 
-                        <TableCell>
-                          <span className="font-medium">
-                            ${product.price.toFixed(2)}
-                          </span>
-                        </TableCell>
                         <TableCell>
                           <StatusBadge
                             status={product.isActive ? "active" : "inactive"}
                           />
                         </TableCell>
                         <TableCell>
-                          <div className="flex gap-1">
-                            {product.isFeatured && (
-                              <StatusBadge status="featured" />
-                            )}
-                            {product.isBest && <StatusBadge status="best" />}
-                          </div>
+                          <HoverCard>
+                            <HoverCardTrigger asChild>
+                              <span className="text-sm text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                                {product.variants.length} variant(s)
+                              </span>
+                            </HoverCardTrigger>
+                            <HoverCardContent className="w-80 p-3 bg-white">
+                              <div className="space-y-2">
+                                <h4 className="text-sm font-semibold">
+                                  Variants
+                                </h4>
+                                <div className="max-h-48 overflow-y-auto space-y-1">
+                                  {product.variants.map((variant) => (
+                                    <div
+                                      key={variant.id}
+                                      className="flex justify-between items-center text-xs p-1.5 bg-muted/50 rounded"
+                                    >
+                                      <span className="font-medium">
+                                        {variant.sku}
+                                      </span>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-muted-foreground">
+                                          ${Number(variant.price).toFixed(2)}
+                                        </span>
+                                        <span
+                                          className={`px-1.5 py-0.5 rounded text-[10px] ${
+                                            variant.stock > 0
+                                              ? "bg-green-100 text-green-700"
+                                              : "bg-red-100 text-red-700"
+                                          }`}
+                                        >
+                                          {variant.stock} in stock
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </HoverCardContent>
+                          </HoverCard>
                         </TableCell>
+                        {/* Action btns */}
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
