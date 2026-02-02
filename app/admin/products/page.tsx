@@ -52,7 +52,6 @@ import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { categories } from "./add_product/page";
 
-
 const ProductsPage = () => {
   const { products, isLoading, deleteProduct } = useProducts();
   const [searchQuery, setSearchQuery] = useState("");
@@ -63,6 +62,7 @@ const ProductsPage = () => {
   const { toast } = useToast();
 
   const filteredProducts = useMemo(() => {
+    if (!Array.isArray(products)) return [];
     return products.filter((product) => {
       const matchesSearch = product.name
         .toLowerCase()
@@ -100,11 +100,8 @@ const ProductsPage = () => {
   };
 
   const categoryMap = useMemo(() => {
-    return Object.fromEntries(
-      categories.map((cat) => [cat.id, cat.name])
-    );
+    return Object.fromEntries(categories.map((cat) => [cat.id, cat.name]));
   }, []);
-
 
   return (
     <PageTransition>
@@ -140,7 +137,6 @@ const ProductsPage = () => {
               setCategoryFilter(value === "all" ? "all" : Number(value))
             }
           >
-
             <SelectTrigger className="w-[180px]">
               <Filter className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Category" />
@@ -151,7 +147,6 @@ const ProductsPage = () => {
                   {cat.name}
                 </SelectItem>
               ))}
-
             </SelectContent>
           </Select>
         </FadeIn>
@@ -171,11 +166,11 @@ const ProductsPage = () => {
               </div>
               <h3 className="text-lg font-medium mb-2">No products found</h3>
               <p className="text-muted-foreground mb-4">
-                {searchQuery || categoryFilter !== "All"
+                {searchQuery || categoryFilter !== "all"
                   ? "Try adjusting your filters"
                   : "Get started by adding your first product"}
               </p>
-              {!searchQuery && categoryFilter === "All" && (
+              {!searchQuery && categoryFilter === "all" && (
                 <Link href="/admin/products/add_product">
                   <Button className="bg-orange-500 hover:bg-accent/90 text-accent-foreground">
                     <Plus className="w-4 h-4 mr-2" />
@@ -253,7 +248,9 @@ const ProductsPage = () => {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <Link href={`/admin/products/edit_product/${product.id}`}>
+                              <Link
+                                href={`/admin/products/edit_product/${product.id}`}
+                              >
                                 <DropdownMenuItem>
                                   <Edit className="w-4 h-4 mr-2" />
                                   Edit
