@@ -5,13 +5,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
 import { Plus, Trash2, ArrowLeft, Loader2 } from "lucide-react";
-import { UpdateProductInput, ProductVariant } from "@/types/product";
+import { ProductVariant } from "@/types/product";
 import { PageTransition, FadeIn } from "@/components/ui/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -24,37 +23,33 @@ import { useToast } from "@/hooks/use-toast";
 import { useParams, useRouter } from "next/navigation";
 import { useProducts } from "@/hooks/useProducts";
 import { useProduct } from "@/hooks/useProduct";
-import { categories } from "../../add_product/page";
+import { useCategories } from "@/hooks/useCategories";
 
-const variantSchema = z
-  .object({
-    size: z.string().min(1, "Size is required"),
-    color: z.string().min(1, "Color is required"),
-    price: z.number().min(0, "Price must be positive"),
-    stock: z.number().min(0, "Stock must be positive"),
-  })
-  .passthrough();
+// Variant schema matching backend structure
+const variantSchema = z.object({
+  sku: z.string().min(1, "SKU is required"),
+  price: z.number().min(0, "Price must be positive"),
+  stock: z.number().min(0, "Stock must be positive"),
+});
 
-export const productSchema = z.object({
-  name: z.string().min(1).max(100),
-  description: z.string().min(1).max(500),
-  price: z.number().min(0),
-  categoryId: z.number().int().positive("Category is required"),
-  isFeatured: z.boolean(),
-  isBest: z.boolean().optional(),
-  isActive: z.boolean(),
-  variants: z.array(variantSchema).min(1),
+// Product schema matching backend structure
+const productSchema = z.object({
+  name: z.string().min(1, "Name is required").max(100),
+  description: z.string().min(1, "Description is required").max(500),
+  categoryId: z.number().min(1, "Category is required"),
+  variants: z.array(variantSchema).min(1, "At least one variant is required"),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
 
 const EditProductPage = () => {
   const params = useParams<{ id: string }>();
-  const stringId = params?.id; // id will be string | undefined
+  const stringId = params?.id;
   const id = Number(stringId);
   const router = useRouter();
   const { product, isLoading: isLoadingProduct, error } = useProduct(id);
   const { updateProduct } = useProducts();
+  const { categories, isLoading: isLoadingCategories } = useCategories();
   const { toast } = useToast();
 
   const {
@@ -68,12 +63,8 @@ const EditProductPage = () => {
     defaultValues: {
       name: "",
       description: "",
-      price: 0,
       categoryId: 0,
-      isFeatured: false,
-      isBest: false,
-      isActive: true,
-      variants: [{ size: "", color: "", price: 0, stock: 0 }],
+      variants: [{ sku: "", price: 0, stock: 0 }],
     },
   });
 
@@ -87,14 +78,9 @@ const EditProductPage = () => {
       reset({
         name: product.name,
         description: product.description,
-        price: product.price,
         categoryId: product.categoryId,
-        isFeatured: product.isFeatured,
-        isBest: product.isBest,
-        isActive: product.isActive,
         variants: product.variants.map((v) => ({
-          size: v.size,
-          color: v.color,
+          sku: v.sku || "",
           price: v.price,
           stock: v.stock,
         })),
@@ -103,28 +89,20 @@ const EditProductPage = () => {
   }, [product, reset]);
 
   const onSubmit = async (data: ProductFormData) => {
-    console.log("Submitting data:", data);
     if (!id) return;
 
     try {
-      const updateData: UpdateProductInput = {
+      const updateData = {
         name: data.name,
         description: data.description,
-        price: data.price,
         categoryId: data.categoryId,
-        isFeatured: data.isFeatured,
-        isBest: data.isBest,
-        isActive: data.isActive,
-        variants: data.variants.map(
-          (v): ProductVariant => ({
-            size: v.size,
-            color: v.color,
-            price: v.price,
-            stock: v.stock,
-          })
-        ),
+        variants: data.variants.map((v) => ({
+          sku: v.sku,
+          price: v.price,
+          stock: v.stock,
+        })),
       };
-      console.log("Update payload:", updateData);
+
       await updateProduct(id, updateData);
       toast({
         title: "Product updated",
@@ -132,6 +110,7 @@ const EditProductPage = () => {
       });
       router.push("/admin/products");
     } catch (error) {
+      console.error("Error updating product:", error);
       toast({
         title: "Error",
         description: "Failed to update product. Please try again.",
@@ -167,7 +146,7 @@ const EditProductPage = () => {
         <div className="flex flex-col items-center justify-center py-16">
           <h2 className="text-xl font-semibold mb-2">Product not found</h2>
           <p className="text-muted-foreground mb-4">
-            The product youre looking for doesnt exist.
+            The product you&apos;re looking for doesn&apos;t exist.
           </p>
           <Button onClick={() => router.push("/admin/products")}>
             Back to Products
@@ -233,24 +212,7 @@ const EditProductPage = () => {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="price">Price ($)</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    {...register("price", { valueAsNumber: true })}
-                    className={errors.price ? "border-destructive" : ""}
-                  />
-                  {errors.price && (
-                    <p className="text-sm text-destructive">
-                      {errors.price.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-2">
                   <Label>Category</Label>
                   <Controller
                     name="categoryId"
@@ -259,6 +221,7 @@ const EditProductPage = () => {
                       <Select
                         value={field.value ? String(field.value) : ""}
                         onValueChange={(value) => field.onChange(Number(value))}
+                        disabled={isLoadingCategories}
                       >
                         <SelectTrigger
                           className={
@@ -287,75 +250,6 @@ const EditProductPage = () => {
             </div>
           </FadeIn>
 
-          {/* Flags */}
-          <FadeIn delay={0.2}>
-            <div className="bg-card rounded-lg border p-6 shadow-card space-y-6">
-              <h2 className="text-lg font-semibold">Product Flags</h2>
-
-              <div className="space-y-4">
-                <Controller
-                  name="isFeatured"
-                  control={control}
-                  render={({ field }) => (
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label htmlFor="isFeatured">Featured Product</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Show this product in the featured section
-                        </p>
-                      </div>
-                      <Switch
-                        id="isFeatured"
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </div>
-                  )}
-                />
-
-                <Controller
-                  name="isBest"
-                  control={control}
-                  render={({ field }) => (
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label htmlFor="isBest">Best Seller</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Mark as a best-selling product
-                        </p>
-                      </div>
-                      <Switch
-                        id="isBest"
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </div>
-                  )}
-                />
-
-                <Controller
-                  name="isActive"
-                  control={control}
-                  render={({ field }) => (
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label htmlFor="isActive">Active</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Make this product visible to customers
-                        </p>
-                      </div>
-                      <Switch
-                        id="isActive"
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </div>
-                  )}
-                />
-              </div>
-            </div>
-          </FadeIn>
-
           {/* Variants */}
           <FadeIn delay={0.3}>
             <div className="bg-card rounded-lg border p-6 shadow-card space-y-6">
@@ -366,7 +260,7 @@ const EditProductPage = () => {
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    append({ size: "", color: "", price: 0, stock: 0 })
+                    append({ sku: "", price: 0, stock: 0 })
                   }
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -390,29 +284,21 @@ const EditProductPage = () => {
                     className="grid gap-4 md:grid-cols-5 p-4 bg-muted/50 rounded-lg relative"
                   >
                     <div className="space-y-2">
-                      <Label>Size</Label>
+                      <Label>SKU</Label>
                       <Input
-                        placeholder="e.g., M, L, XL"
-                        {...register(`variants.${index}.size`)}
+                        placeholder="e.g., SKU-123"
+                        {...register(`variants.${index}.sku`)}
                         className={
-                          errors.variants?.[index]?.size
+                          errors.variants?.[index]?.sku
                             ? "border-destructive"
                             : ""
                         }
                       />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Color</Label>
-                      <Input
-                        placeholder="e.g., Black"
-                        {...register(`variants.${index}.color`)}
-                        className={
-                          errors.variants?.[index]?.color
-                            ? "border-destructive"
-                            : ""
-                        }
-                      />
+                      {errors.variants?.[index]?.sku && (
+                        <p className="text-sm text-destructive">
+                          {errors.variants[index]?.sku?.message}
+                        </p>
+                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -430,6 +316,11 @@ const EditProductPage = () => {
                             : ""
                         }
                       />
+                      {errors.variants?.[index]?.price && (
+                        <p className="text-sm text-destructive">
+                          {errors.variants[index]?.price?.message}
+                        </p>
+                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -446,6 +337,11 @@ const EditProductPage = () => {
                             : ""
                         }
                       />
+                      {errors.variants?.[index]?.stock && (
+                        <p className="text-sm text-destructive">
+                          {errors.variants[index]?.stock?.message}
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex items-end">

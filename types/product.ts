@@ -54,7 +54,7 @@ export interface CreateVariantInput {
   sku: string;
   price: number;
   stock: number;
-  attributes: VariantAttribute[];
+  attributes?: VariantAttribute[];
 }
 
 export interface UpdateProductInput extends Partial<CreateProductInput> {
