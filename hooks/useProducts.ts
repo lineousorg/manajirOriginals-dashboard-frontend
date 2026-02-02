@@ -43,8 +43,8 @@ export const useProducts = () => {
   };
 
   const updateProduct = async (
-    id: string,
-    data: UpdateProductInput,
+    id: number,
+    data: UpdateProductInput
   ): Promise<Product> => {
     setError(null);
     try {
@@ -58,8 +58,8 @@ export const useProducts = () => {
   };
 
   const patchProduct = async (
-    id: string,
-    data: Partial<UpdateProductInput>,
+    id: number,
+    data: Partial<UpdateProductInput>
   ): Promise<Product> => {
     setError(null);
     try {
@@ -72,7 +72,7 @@ export const useProducts = () => {
     }
   };
 
-  const deleteProduct = async (id: string): Promise<void> => {
+  const deleteProduct = async (id: number): Promise<void> => {
     setError(null);
     try {
       await productsApi.delete(id);

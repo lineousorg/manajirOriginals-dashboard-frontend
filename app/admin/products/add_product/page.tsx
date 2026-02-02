@@ -41,7 +41,7 @@ const productSchema = z.object({
 
 type ProductFormData = z.infer<typeof productSchema>;
 
-export const categories = [{ id: 1, name: "Fashion" }];
+export const categories = [{ id: 1, name: "Fashion", isActive: true }];
 
 const CreateProductPage = () => {
   const router = useRouter();
@@ -78,7 +78,7 @@ const CreateProductPage = () => {
         price: data.price,
         categoryId: data.categoryId,
         isActive: data.isActive,
-        isBest: data?.isBest || undefined,
+        isBest: data.isBest,
         isFeatured: data.isFeatured,
         variants: data.variants.map((v) => ({
           size: v.size,
@@ -237,7 +237,7 @@ const CreateProductPage = () => {
                     </div>
                   )}
                 />
-                {/* 
+                
                 <Controller
                   name="isBest"
                   control={control}
@@ -256,7 +256,7 @@ const CreateProductPage = () => {
                       />
                     </div>
                   )}
-                /> */}
+                />
 
                 <Controller
                   name="isActive"
