@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useFieldArray, useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,12 +21,19 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { CreateProductInput, CreateVariantInput } from "@/types/product";
+import { CreateProductInput, ProductImage } from "@/types/product";
 
 // Variant attribute schema
 const attributeSchema = z.object({
   attributeId: z.number(),
   valueId: z.number(),
+});
+
+// Image schema
+const imageSchema = z.object({
+  url: z.string().min(1, "Image URL is required"),
+  altText: z.string().optional().default(""),
+  position: z.number(),
 });
 
 // Variant schema matching backend structure
@@ -43,6 +51,7 @@ const productSchema = z.object({
   slug: z.string().min(1, "Slug is required").max(100),
   categoryId: z.number().min(1, "Category is required"),
   variants: z.array(variantSchema).min(1, "At least one variant is required"),
+  images: z.array(imageSchema).optional().default([]),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -68,6 +77,7 @@ const CreateProductPage = () => {
       slug: "",
       categoryId: 0,
       variants: [{ sku: "", price: 0, stock: 0, attributes: [] }],
+      images: [],
     },
   });
 
@@ -75,6 +85,43 @@ const CreateProductPage = () => {
     control,
     name: "variants",
   });
+
+  const { fields: imageFields, append: appendImage, remove: removeImage } = useFieldArray({
+    control,
+    name: "images",
+  });
+
+  // Convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // Handle image file selection
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const currentImages = watch("images") || [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const base64 = await fileToBase64(file);
+        appendImage({
+          url: base64,
+          altText: file.name,
+          position: currentImages.length + i,
+        });
+      } catch (error) {
+        console.error("Error converting file to base64:", error);
+      }
+    }
+  };
 
   // Auto-generate slug from name
   const nameValue = watch("name");
@@ -98,6 +145,11 @@ const CreateProductPage = () => {
           price: v.price,
           stock: v.stock,
           attributes: v.attributes || [],
+        })),
+        images: data.images.map((img, index) => ({
+          url: img.url,
+          altText: img.altText,
+          position: index,
         })),
       };
 
@@ -242,7 +294,7 @@ const CreateProductPage = () => {
                         >
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-white">
                           {categories.map((cat) => (
                             <SelectItem key={cat.id} value={String(cat.id)}>
                               {cat.name}
@@ -435,6 +487,78 @@ const CreateProductPage = () => {
                   </motion.div>
                 ))}
               </div>
+            </div>
+          </FadeIn>
+
+          {/* Images */}
+          <FadeIn delay={0.35}>
+            <div className="bg-card rounded-lg border p-6 shadow-card space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Product Images</h2>
+                <Label
+                  htmlFor="image-upload"
+                  className="cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md inline-flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Images
+                </Label>
+                <input
+                  id="image-upload"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
+              </div>
+
+              {imageFields.length === 0 && (
+                <p className="text-muted-foreground text-sm">
+                  No images added yet. Click &quot;Add Images&quot; to upload.
+                </p>
+              )}
+
+              <div className="grid gap-4 md:grid-cols-3">
+                {imageFields.map((field, index) => (
+                  <motion.div
+                    key={field.id}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="relative group"
+                  >
+                    <div className="aspect-square bg-muted rounded-lg overflow-hidden border">
+                      <img
+                        src={watch(`images.${index}.url`)}
+                        alt={watch(`images.${index}.altText`) || `Product image ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="mt-2 space-y-2">
+                      <Input
+                        placeholder="Alt text (optional)"
+                        {...register(`images.${index}.altText`)}
+                        className="text-xs"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeImage(index)}
+                        className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Remove
+                      </Button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              {errors.images && (
+                <p className="text-sm text-destructive">
+                  {errors.images.message}
+                </p>
+              )}
             </div>
           </FadeIn>
 

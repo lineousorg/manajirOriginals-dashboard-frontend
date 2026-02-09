@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Package,
   ArrowUpRight,
@@ -7,39 +9,42 @@ import {
   Users,
 } from "lucide-react";
 import { PageTransition, FadeIn, ScaleOnHover } from "@/components/ui/motion";
-
-const stats = [
-  {
-    title: "Total Products",
-    value: "2,345",
-    change: "+12.5%",
-    isPositive: true,
-    icon: Package,
-  },
-  {
-    title: "Total Orders",
-    value: "1,234",
-    change: "+8.2%",
-    isPositive: true,
-    icon: ShoppingCart,
-  },
-  {
-    title: "Total Customers",
-    value: "4,567",
-    change: "+23.1%",
-    isPositive: true,
-    icon: Users,
-  },
-  {
-    title: "Revenue",
-    value: "$45,678",
-    change: "-2.4%",
-    isPositive: false,
-    icon: TrendingUp,
-  },
-];
+import { useProducts } from "@/hooks/useProducts";
 
 export default function DashboardPage() {
+  const { products } = useProducts();
+
+  const stats = [
+    {
+      title: "Total Products",
+      value: `${products.length}`,
+      change: "+5",
+      isPositive: true,
+      icon: Package,
+    },
+    {
+      title: "Total Orders",
+      value: 0,
+      change: "0%",
+      isPositive: true,
+      icon: ShoppingCart,
+    },
+    {
+      title: "Total Customers",
+      value: 0,
+      change: "+0%",
+      isPositive: true,
+      icon: Users,
+    },
+    {
+      title: "Revenue",
+      value: 0,
+      change: "0%",
+      isPositive: false,
+      icon: TrendingUp,
+    },
+  ];
+
   return (
     <PageTransition>
       <div className="space-y-6">
@@ -91,28 +96,36 @@ export default function DashboardPage() {
             <div className="bg-card rounded-lg border p-6 shadow-card">
               <h2 className="text-lg font-semibold mb-4">Recent Orders</h2>
               <div className="space-y-4">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between py-2 border-b last:border-0"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-                        #{i}
+                {[].length === 0 ? (
+                  <small className="text-center">No orders found</small>
+                ) : (
+                  [].map((i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between py-2 border-b last:border-0"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
+                          #{i}
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">Order #100{i}</p>
+                          <p className="text-xs text-muted-foreground">
+                            2 items
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-sm">Order #100{i}</p>
-                        <p className="text-xs text-muted-foreground">2 items</p>
+                      <div className="text-right">
+                        <p className="font-medium text-sm">
+                          {/* ${(Math.random() * 200 + 50).toFixed(2)} */}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Just now
+                        </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium text-sm">
-                        {/* ${(Math.random() * 200 + 50).toFixed(2)} */}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Just now</p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </FadeIn>
@@ -121,15 +134,9 @@ export default function DashboardPage() {
             <div className="bg-card rounded-lg border p-6 shadow-card">
               <h2 className="text-lg font-semibold mb-4">Top Products</h2>
               <div className="space-y-4">
-                {[
-                  "Premium Headphones",
-                  "Cotton T-Shirt",
-                  "Smart Hub",
-                  "Yoga Mat",
-                  "Leather Bag",
-                ].map((product, i) => (
+                {products.map((product, i) => (
                   <div
-                    key={product}
+                    key={product.id}
                     className="flex items-center justify-between py-2 border-b last:border-0"
                   >
                     <div className="flex items-center gap-3">
@@ -137,7 +144,7 @@ export default function DashboardPage() {
                         <Package className="w-5 h-5 text-muted-foreground" />
                       </div>
                       <div>
-                        <p className="font-medium text-sm">{product}</p>
+                        <p className="font-medium text-sm">{product.name}</p>
                         <p className="text-xs text-muted-foreground">
                           {/* {(Math.random() * 100 + 20).toFixed(0)} sold */}
                         </p>

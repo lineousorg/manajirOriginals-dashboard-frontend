@@ -37,17 +37,25 @@ export interface Product {
   categoryId: number;
   category: ProductCategory;
   variants: ProductVariant[];
+  images?: ProductImage[];
   createdAt: string;
   updatedAt: string;
 }
 
 // Input types for creating/updating products
+export interface ProductImage {
+  url: string;
+  altText: string;
+  position: number;
+}
+
 export interface CreateProductInput {
   name: string;
   slug: string;
   description: string;
   categoryId: number;
   variants: CreateVariantInput[];
+  images?: ProductImage[];
 }
 
 export interface CreateVariantInput {

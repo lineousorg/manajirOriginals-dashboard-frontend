@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useProducts } from "@/hooks/useProducts";
 import { useCategories } from "@/hooks/useCategories";
-import { Product } from "@/types/product";
+import { Product, ProductImage } from "@/types/product";
 import { PageTransition, FadeIn } from "@/components/ui/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -213,8 +213,16 @@ const ProductsPage = () => {
                       >
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                              <Package className="w-5 h-5 text-muted-foreground" />
+                            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                              {product.images && product.images.length > 0 ? (
+                                <img
+                                  src={product.images[0].url}
+                                  alt={product.images[0].altText || product.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <Package className="w-5 h-5 text-muted-foreground" />
+                              )}
                             </div>
                             <div>
                               <p className="font-medium">{product.name}</p>
