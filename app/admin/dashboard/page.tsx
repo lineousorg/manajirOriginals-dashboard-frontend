@@ -134,30 +134,34 @@ export default function DashboardPage() {
             <div className="bg-card rounded-lg border p-6 shadow-card">
               <h2 className="text-lg font-semibold mb-4">Top Products</h2>
               <div className="space-y-4">
-                {products.map((product, i) => (
-                  <div
-                    key={product.id}
-                    className="flex items-center justify-between py-2 border-b last:border-0"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                        <Package className="w-5 h-5 text-muted-foreground" />
+                {[].length === 0 ? (
+                  <small className="text-center">No products found</small>
+                ) : (
+                  [].map((product, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between py-2 border-b last:border-0"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                          <Package className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {/* {(Math.random() * 100 + 20).toFixed(0)} sold */}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-sm">{product.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {/* {(Math.random() * 100 + 20).toFixed(0)} sold */}
+                      <div className="text-right">
+                        <p className="text-sm text-success flex items-center gap-1">
+                          <ArrowUpRight className="w-3 h-3" />
+                          {/* {(Math.random() * 30 + 5).toFixed(1)}% */}
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm text-success flex items-center gap-1">
-                        <ArrowUpRight className="w-3 h-3" />
-                        {/* {(Math.random() * 30 + 5).toFixed(1)}% */}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </FadeIn>

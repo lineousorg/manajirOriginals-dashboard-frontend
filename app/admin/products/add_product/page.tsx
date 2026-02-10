@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import { useFieldArray, useForm, Controller } from "react-hook-form";
+import { useFieldArray, useForm, Controller, useWatch } from "react-hook-form";
+import { useEffect, useRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
@@ -56,9 +57,73 @@ const productSchema = z.object({
 
 type ProductFormData = z.infer<typeof productSchema>;
 
+// Helper function to generate SKU based on product name and variant attributes
+const generateSKU = (
+  productName: string,
+  attributes: Array<{ attributeId: number; valueId: number }>,
+  variantIndex: number,
+  productId?: number,
+): string => {
+  // Convert product name to uppercase without spaces, limit to first 5 characters
+  const words = productName
+    .toUpperCase()
+    .replace(/[^A-Z\s-]/g, "")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (words.length === 0) return "";
+
+  const initials = words.map((word) => word[0]).join("");
+
+  const lastWordConsonants = words[words.length - 1]
+    .slice(1)
+    .replace(/[AEIOU]/g, "");
+
+  const nameSku = initials + lastWordConsonants;
+
+  // Size and Color attribute IDs from mock data
+  const SIZE_ATTR_ID = 1;
+  const COLOR_ATTR_ID = 2;
+
+  const sizeValue = attributes.find(
+    (a) => a.attributeId === SIZE_ATTR_ID,
+  )?.valueId;
+  const colorValue = attributes.find(
+    (a) => a.attributeId === COLOR_ATTR_ID,
+  )?.valueId;
+
+  // Get display values from mock attributes
+  const sizeMap: Record<number, string> = { 1: "M", 2: "L" };
+  const colorMap: Record<number, string> = {
+    3: "BLK",
+    4: "WHT",
+    5: "RED",
+    6: "BLU",
+    7: "GRN",
+    8: "YEL",
+    9: "ORG",
+    10: "PNK",
+    11: "GRY",
+    12: "BRN",
+    13: "NAV",
+    14: "BEG",
+    15: "CRM",
+    16: "SIL",
+    17: "GOL",
+    18: "MRN",
+  };
+
+  const size = sizeValue ? sizeMap[sizeValue] || "" : "";
+  const color = colorValue ? colorMap[colorValue] || "" : "";
+  console.log(color);
+
+  // Format: NAME-COLOR-SIZE (e.g., TSHIRT-WHT-L)
+  return `${nameSku}-${size}-${color}`.toUpperCase();
+};
+
 const CreateProductPage = () => {
   const router = useRouter();
-  const { createProduct } = useProducts();
+  const { createProduct, updateProduct } = useProducts();
   const { categories, isLoading: isLoadingCategories } = useCategories();
   const { toast } = useToast();
 
@@ -81,12 +146,24 @@ const CreateProductPage = () => {
     },
   });
 
+  // Store generated SKUs before product creation
+  const generatedSKUsRef = useRef<
+    Array<{
+      index: number;
+      attributes: Array<{ attributeId: number; valueId: number }>;
+    }>
+  >([]);
+
   const { fields, append, remove } = useFieldArray({
     control,
     name: "variants",
   });
 
-  const { fields: imageFields, append: appendImage, remove: removeImage } = useFieldArray({
+  const {
+    fields: imageFields,
+    append: appendImage,
+    remove: removeImage,
+  } = useFieldArray({
     control,
     name: "images",
   });
@@ -107,7 +184,7 @@ const CreateProductPage = () => {
     if (!files || files.length === 0) return;
 
     const currentImages = watch("images") || [];
-    
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       try {
@@ -123,8 +200,31 @@ const CreateProductPage = () => {
     }
   };
 
-  // Auto-generate slug from name
+  // Store previous SKU values to prevent infinite loop
+  const previousSkusRef = useRef<Array<string>>([]);
+
+  // Auto-generate SKU when product name or variant attributes change
   const nameValue = watch("name");
+  const variantsValue = useWatch({ control, name: "variants" });
+
+  useEffect(() => {
+    if (variantsValue && variantsValue.length > 0) {
+      variantsValue.forEach((variant, index) => {
+        const newSku = generateSKU(nameValue, variant.attributes || [], index);
+        // Only update if SKU has changed
+        if (previousSkusRef.current[index] !== newSku) {
+          setValue(`variants.${index}.sku`, newSku);
+          previousSkusRef.current[index] = newSku;
+        }
+        // Store the variant data for SKU regeneration after product creation
+        generatedSKUsRef.current[index] = {
+          index,
+          attributes: variant.attributes || [],
+        };
+      });
+    }
+  }, [nameValue, variantsValue, setValue]);
+
   const handleNameChange = (value: string) => {
     const slug = value
       .toLowerCase()
@@ -153,7 +253,29 @@ const CreateProductPage = () => {
         })),
       };
 
-      await createProduct(productData);
+      // Create product and get the response with productId
+      const createdProduct = await createProduct(productData);
+
+      // Regenerate SKUs with actual productId
+      const updatedVariants = createdProduct.variants.map((variant, index) => {
+        const variantData = generatedSKUsRef.current.find(
+          (v) => v.index === index,
+        );
+        const newSku = generateSKU(
+          data.name,
+          variantData?.attributes || [],
+          index,
+          createdProduct.id,
+        );
+        return {
+          ...variant,
+          sku: newSku,
+        };
+      });
+
+      // Update product with correct SKUs
+      await updateProduct(createdProduct.id, { variants: updatedVariants });
+
       toast({
         title: "Product created",
         description: `${data.name} has been created successfully.`,
@@ -229,22 +351,62 @@ const CreateProductPage = () => {
               <h2 className="text-lg font-semibold">Basic Information</h2>
 
               <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="name">Product Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="Enter product name"
-                    {...register("name")}
-                    onChange={(e) => handleNameChange(e.target.value)}
-                    className={errors.name ? "border-destructive" : ""}
-                  />
-                  {errors.name && (
-                    <p className="text-sm text-destructive">
-                      {errors.name.message}
-                    </p>
-                  )}
+                <div className="grid grid-cols-2 col-span-2 gap-4">
+                  {/* Product name */}
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Product Name</Label>
+                    <Input
+                      id="name"
+                      placeholder="Enter product name"
+                      {...register("name")}
+                      onChange={(e) => handleNameChange(e.target.value)}
+                      className={errors.name ? "border-destructive" : ""}
+                    />
+                    {errors.name && (
+                      <p className="text-sm text-destructive">
+                        {errors.name.message}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Category selection */}
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Controller
+                      name="categoryId"
+                      control={control}
+                      render={({ field }) => (
+                        <Select
+                          value={String(field.value)}
+                          onValueChange={(val) => field.onChange(Number(val))}
+                          disabled={isLoadingCategories}
+                        >
+                          <SelectTrigger
+                            className={
+                              errors.categoryId ? "border-destructive" : ""
+                            }
+                          >
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white">
+                            {categories.map((cat) => (
+                              <SelectItem key={cat.id} value={String(cat.id)}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    {errors.categoryId && (
+                      <p className="text-sm text-destructive">
+                        {errors.categoryId.message}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
+                {/* Product slug */}
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="slug">Slug</Label>
                   <Input
@@ -260,6 +422,7 @@ const CreateProductPage = () => {
                   )}
                 </div>
 
+                {/* Product description */}
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="description">Description</Label>
                   <Textarea
@@ -276,39 +439,80 @@ const CreateProductPage = () => {
                   )}
                 </div>
 
-                <div className="space-y-2 md:col-span-2">
-                  <Label>Category</Label>
-                  <Controller
-                    name="categoryId"
-                    control={control}
-                    render={({ field }) => (
-                      <Select
-                        value={String(field.value)}
-                        onValueChange={(val) => field.onChange(Number(val))}
-                        disabled={isLoadingCategories}
+                {/* Images */}
+                <div className="col-span-2">
+                  <Label>Product Images</Label>
+                  <div className="bg-card rounded-lg border p-4 shadow-card space-y-6 ">
+                    <div className="flex items-center justify-end">
+                      <input
+                        id="image-upload"
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={handleImageUpload}
+                      />
+                      <Label
+                        htmlFor="image-upload"
+                        className="cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md inline-flex items-center gap-2"
                       >
-                        <SelectTrigger
-                          className={
-                            errors.categoryId ? "border-destructive" : ""
-                          }
-                        >
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white">
-                          {categories.map((cat) => (
-                            <SelectItem key={cat.id} value={String(cat.id)}>
-                              {cat.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <Plus className="w-4 h-4" />
+                        Add Images
+                      </Label>
+                    </div>
+
+                    {imageFields.length === 0 && (
+                      <p className="text-muted-foreground text-sm">
+                        No images added yet. Click &quot;Add Images&quot; to
+                        upload.
+                      </p>
                     )}
-                  />
-                  {errors.categoryId && (
-                    <p className="text-sm text-destructive">
-                      {errors.categoryId.message}
-                    </p>
-                  )}
+
+                    <div className="grid gap-4 md:grid-cols-3">
+                      {imageFields.map((field, index) => (
+                        <motion.div
+                          key={field.id}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="relative group"
+                        >
+                          <div className="aspect-square bg-muted rounded-lg overflow-hidden border">
+                            <img
+                              src={watch(`images.${index}.url`)}
+                              alt={
+                                watch(`images.${index}.altText`) ||
+                                `Product image ${index + 1}`
+                              }
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="mt-2 space-y-2">
+                            <Input
+                              placeholder="Alt text (optional)"
+                              {...register(`images.${index}.altText`)}
+                              className="text-xs"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeImage(index)}
+                              className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Remove
+                            </Button>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+
+                    {errors.images && (
+                      <p className="text-sm text-destructive">
+                        {errors.images.message}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -338,6 +542,7 @@ const CreateProductPage = () => {
                 </p>
               )}
 
+              {/* Product variant */}
               <div className="space-y-4">
                 {fields.map((field, index) => (
                   <motion.div
@@ -347,23 +552,82 @@ const CreateProductPage = () => {
                     exit={{ opacity: 0, x: -20 }}
                     className="grid gap-4 p-4 bg-muted/50 rounded-lg relative"
                   >
-                    <div className="grid gap-4 md:grid-cols-4">
+                    {/* Attributes Section */}
+                    <div className="">
+                      <Label className="text-sm mb-2 block">Attributes</Label>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {mockAttributes.map((attr) => (
+                          <div key={attr.id} className="space-y-2">
+                            <Label className="">{attr.name}</Label>
+                            <Controller
+                              name={`variants.${index}.attributes`}
+                              control={control}
+                              render={({ field: attributeField }) => {
+                                const currentAttr = attributeField.value?.find(
+                                  (a: { attributeId: number }) =>
+                                    a.attributeId === attr.id,
+                                );
+                                return (
+                                  <Select
+                                    value={
+                                      currentAttr
+                                        ? String(currentAttr.valueId)
+                                        : ""
+                                    }
+                                    onValueChange={(val) => {
+                                      const newAttrs = (
+                                        attributeField.value || []
+                                      ).filter(
+                                        (a: { attributeId: number }) =>
+                                          a.attributeId !== attr.id,
+                                      );
+                                      newAttrs.push({
+                                        attributeId: attr.id,
+                                        valueId: Number(val),
+                                      });
+                                      attributeField.onChange(newAttrs);
+                                    }}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue
+                                        placeholder={`Select ${attr.name}`}
+                                      />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-white">
+                                      {attr.values.map((val) => (
+                                        <SelectItem
+                                          key={val.id}
+                                          value={String(val.id)}
+                                        >
+                                          {val.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                );
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4 justify-between border-t pt-4">
                       <div className="space-y-2">
-                        <Label>SKU</Label>
-                        <Input
-                          placeholder="e.g., SKU-123"
-                          {...register(`variants.${index}.sku`)}
-                          className={
-                            errors.variants?.[index]?.sku
-                              ? "border-destructive"
-                              : ""
-                          }
+                        <Label>SKU (Auto-generated)</Label>
+                        <Controller
+                          name={`variants.${index}.sku`}
+                          control={control}
+                          render={({ field }) => (
+                            <Input
+                              placeholder="SKU will be generated"
+                              {...field}
+                              readOnly
+                              disabled
+                              className="bg-muted cursor-not-allowed opacity-70"
+                            />
+                          )}
                         />
-                        {errors.variants?.[index]?.sku && (
-                          <p className="text-sm text-destructive">
-                            {errors.variants[index]?.sku?.message}
-                          </p>
-                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -422,143 +686,9 @@ const CreateProductPage = () => {
                         </Button>
                       </div>
                     </div>
-
-                    {/* Attributes Section */}
-                    <div className="border-t pt-4 mt-2">
-                      <Label className="text-sm mb-2 block">
-                        Attributes (optional)
-                      </Label>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {mockAttributes.map((attr) => (
-                          <div key={attr.id} className="space-y-2">
-                            <Label className="text-xs">{attr.name}</Label>
-                            <Controller
-                              name={`variants.${index}.attributes`}
-                              control={control}
-                              render={({ field: attributeField }) => {
-                                const currentAttr = attributeField.value?.find(
-                                  (a: { attributeId: number }) =>
-                                    a.attributeId === attr.id,
-                                );
-                                return (
-                                  <Select
-                                    value={
-                                      currentAttr
-                                        ? String(currentAttr.valueId)
-                                        : ""
-                                    }
-                                    onValueChange={(val) => {
-                                      const newAttrs = (
-                                        attributeField.value || []
-                                      ).filter(
-                                        (a: { attributeId: number }) =>
-                                          a.attributeId !== attr.id,
-                                      );
-                                      newAttrs.push({
-                                        attributeId: attr.id,
-                                        valueId: Number(val),
-                                      });
-                                      attributeField.onChange(newAttrs);
-                                    }}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue
-                                        placeholder={`Select ${attr.name}`}
-                                      />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {attr.values.map((val) => (
-                                        <SelectItem
-                                          key={val.id}
-                                          value={String(val.id)}
-                                        >
-                                          {val.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                );
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   </motion.div>
                 ))}
               </div>
-            </div>
-          </FadeIn>
-
-          {/* Images */}
-          <FadeIn delay={0.35}>
-            <div className="bg-card rounded-lg border p-6 shadow-card space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Product Images</h2>
-                <Label
-                  htmlFor="image-upload"
-                  className="cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md inline-flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Images
-                </Label>
-                <input
-                  id="image-upload"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={handleImageUpload}
-                />
-              </div>
-
-              {imageFields.length === 0 && (
-                <p className="text-muted-foreground text-sm">
-                  No images added yet. Click &quot;Add Images&quot; to upload.
-                </p>
-              )}
-
-              <div className="grid gap-4 md:grid-cols-3">
-                {imageFields.map((field, index) => (
-                  <motion.div
-                    key={field.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="relative group"
-                  >
-                    <div className="aspect-square bg-muted rounded-lg overflow-hidden border">
-                      <img
-                        src={watch(`images.${index}.url`)}
-                        alt={watch(`images.${index}.altText`) || `Product image ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="mt-2 space-y-2">
-                      <Input
-                        placeholder="Alt text (optional)"
-                        {...register(`images.${index}.altText`)}
-                        className="text-xs"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeImage(index)}
-                        className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Remove
-                      </Button>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-
-              {errors.images && (
-                <p className="text-sm text-destructive">
-                  {errors.images.message}
-                </p>
-              )}
             </div>
           </FadeIn>
 
