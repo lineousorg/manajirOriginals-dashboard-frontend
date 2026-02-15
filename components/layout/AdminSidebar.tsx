@@ -11,6 +11,7 @@ import {
   Users,
   BarChart3,
   FolderTree,
+  ShoppingCart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,8 +22,8 @@ const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard" },
   { icon: Package, label: "Products", path: "/admin/products" },
   { icon: FolderTree, label: "Categories", path: "/admin/categories" },
-  // { icon: ShoppingBag, label: "Orders", path: "/admin/orders" },
-  // { icon: Users, label: "Customers", path: "/admin/customers" },
+  { icon: ShoppingCart, label: "Orders", path: "/admin/orders" },
+  { icon: Users, label: "Users", path: "/admin/users" },
   // { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },
   // { icon: Settings, label: "Settings", path: "/admin/settings" },
 ];
@@ -87,7 +88,7 @@ export const AdminSidebar = () => {
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors relative",
                   isActive
                     ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50",
                 )}
               >
                 {isActive && (

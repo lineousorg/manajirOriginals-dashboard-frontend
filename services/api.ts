@@ -4,7 +4,13 @@ import {
   CreateProductInput,
   UpdateProductInput,
 } from "@/types/product";
-import { Category, CreateCategoryInput, UpdateCategoryInput } from "@/types/category";
+import {
+  Category,
+  CreateCategoryInput,
+  UpdateCategoryInput,
+} from "@/types/category";
+import { Order, OrderStatus, UpdateOrderStatusInput } from "@/types/order";
+import { User } from "@/types/user";
 
 const API_BASE_URL = "http://localhost:5000"; // your backend
 
@@ -44,7 +50,7 @@ api.interceptors.response.use(
       }
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 // Auth API
@@ -80,7 +86,7 @@ export const productsApi = {
   },
   patch: async (
     id: number,
-    data: Partial<UpdateProductInput>
+    data: Partial<UpdateProductInput>,
   ): Promise<Product> => {
     const response = await api.patch(`/products/${id}`, data);
     return response.data.data;
@@ -119,6 +125,40 @@ export const categoriesApi = {
   // Delete category
   delete: async (id: number): Promise<void> => {
     await api.delete(`/categories/${id}`);
+  },
+};
+
+// Orders API
+export const ordersApi = {
+  getAll: async (): Promise<Order[]> => {
+    const response = await api.get("/orders");
+    return response.data.data;
+  },
+
+  getById: async (id: number): Promise<Order> => {
+    const response = await api.get(`/orders/${id}`);
+    return response.data.data;
+  },
+
+  updateStatus: async (
+    id: number,
+    data: UpdateOrderStatusInput,
+  ): Promise<Order> => {
+    const response = await api.patch(`/orders/${id}/status`, data);
+    return response.data.data;
+  },
+};
+
+// Users API
+export const usersApi = {
+  getAll: async (): Promise<User[]> => {
+    const response = await api.get("/users");
+    return response.data.data;
+  },
+
+  getById: async (id: number): Promise<User> => {
+    const response = await api.get(`/users/${id}`);
+    return response.data.data;
   },
 };
 
