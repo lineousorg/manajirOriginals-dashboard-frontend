@@ -253,10 +253,31 @@ const CreateProductPage = () => {
         })),
       };
 
+      console.log(productData);
+
       // Create product and get the response with productId
       const createdProduct = await createProduct(productData);
 
       // Regenerate SKUs with actual productId
+      // const updatedVariants = createdProduct.variants.map((variant, index) => {
+      //   const variantData = generatedSKUsRef.current.find(
+      //     (v) => v.index === index,
+      //   );
+      //   const newSku = generateSKU(
+      //     data.name,
+      //     variantData?.attributes || [],
+      //     index,
+      //     createdProduct.id,
+      //   );
+      //   return {
+      //     ...variant,
+      //     sku: newSku,
+      //   };
+      // });
+
+      // // Update product with correct SKUs
+      // await updateProduct(createdProduct.id, { variants: updatedVariants });
+
       const updatedVariants = createdProduct.variants.map((variant, index) => {
         const variantData = generatedSKUsRef.current.find(
           (v) => v.index === index,
@@ -267,13 +288,17 @@ const CreateProductPage = () => {
           index,
           createdProduct.id,
         );
+
+        // Only send the fields that should be updated
         return {
-          ...variant,
+          // id: variant.id, // Need the ID to know which variant to update
           sku: newSku,
+          price: variant.price,
+          stock: variant.stock,
         };
       });
 
-      // Update product with correct SKUs
+      // Update only sends sku, price, stock - NOT id, productId, createdAt, updatedAt
       await updateProduct(createdProduct.id, { variants: updatedVariants });
 
       toast({
