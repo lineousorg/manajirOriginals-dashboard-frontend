@@ -11,6 +11,7 @@ import {
   Calendar,
   X,
   Loader2,
+  Download,
 } from "lucide-react";
 import { useOrders } from "@/hooks/useOrders";
 import { Order, OrderStatus, OrderItem } from "@/types/order";
@@ -257,7 +258,7 @@ const OrderDetailsModal = ({
 };
 
 const OrdersPage = () => {
-  const { orders, isLoading, updateOrderStatus } = useOrders();
+  const { orders, isLoading, updateOrderStatus, downloadReceipt } = useOrders();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
   const { toast } = useToast();
@@ -265,6 +266,9 @@ const OrdersPage = () => {
   // Modal state
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+
+  // Download receipt state
+  const [downloadingReceipt, setDownloadingReceipt] = useState<number | null>(null);
 
   const filteredOrders = useMemo(() => {
     if (!Array.isArray(orders)) return [];
@@ -298,6 +302,25 @@ const OrdersPage = () => {
   const handleViewOrder = (order: Order) => {
     setSelectedOrderId(order.id);
     setViewModalOpen(true);
+  };
+
+  const handleDownloadReceipt = async (orderId: number) => {
+    try {
+      setDownloadingReceipt(orderId);
+      await downloadReceipt(orderId);
+      toast({
+        title: "Receipt downloaded",
+        description: `Receipt for Order #${orderId} has been downloaded.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to download receipt. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingReceipt(null);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -462,14 +485,30 @@ const OrdersPage = () => {
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleViewOrder(order)}
-                            className="hover:bg-accent/10"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDownloadReceipt(order.id)}
+                              disabled={downloadingReceipt === order.id}
+                              className="hover:bg-accent/10"
+                              title="Download Receipt"
+                            >
+                              {downloadingReceipt === order.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Download className="w-4 h-4" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleViewOrder(order)}
+                              className="hover:bg-accent/10"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </motion.tr>
                     ))}

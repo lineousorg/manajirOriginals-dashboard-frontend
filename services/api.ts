@@ -12,8 +12,8 @@ import {
 import { Order, OrderStatus, UpdateOrderStatusInput } from "@/types/order";
 import { User } from "@/types/user";
 
-// const API_BASE_URL = "http://localhost:5000/api"; // your backend
-const API_BASE_URL = "https://manajiroriginals.com/api";
+const API_BASE_URL = "http://localhost:5000/api"; // your backend
+// const API_BASE_URL = "https://manajiroriginals.com/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -147,6 +147,14 @@ export const ordersApi = {
   ): Promise<Order> => {
     const response = await api.patch(`/orders/${id}/status`, data);
     return response.data.data;
+  },
+
+  // Download receipt as PDF
+  getReceipt: async (id: number): Promise<Blob> => {
+    const response = await api.get(`/orders/${id}/receipt`, {
+      responseType: "blob",
+    });
+    return response.data;
   },
 };
 

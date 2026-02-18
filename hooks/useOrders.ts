@@ -53,6 +53,28 @@ export const useOrders = () => {
     }
   };
 
+  const downloadReceipt = async (id: number): Promise<void> => {
+    setError(null);
+    try {
+      const blob = await ordersApi.getReceipt(id);
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      // Create a temporary link element
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `receipt-${id}.pdf`);
+      // Append to body, click, and remove
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      // Clean up the URL
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Failed to download receipt");
+      throw err;
+    }
+  };
+
   return {
     orders,
     isLoading,
@@ -60,5 +82,6 @@ export const useOrders = () => {
     refetch: fetchOrders,
     getOrderById,
     updateOrderStatus,
+    downloadReceipt,
   };
 };
