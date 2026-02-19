@@ -8,6 +8,8 @@ import { motion } from "framer-motion";
 import { Plus, Trash2, ArrowLeft, Loader2 } from "lucide-react";
 import { useProducts } from "@/hooks/useProducts";
 import { useCategories } from "@/hooks/useCategories";
+import { useAttributes } from "@/hooks/useAttributes";
+import { useAttributeValues } from "@/hooks/useAttributeValues";
 import { PageTransition, FadeIn } from "@/components/ui/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,8 +63,8 @@ type ProductFormData = z.infer<typeof productSchema>;
 const generateSKU = (
   productName: string,
   attributes: Array<{ attributeId: number; valueId: number }>,
+  attributeValues: Array<{ id: number; value: string; attributeId: number }>,
   variantIndex: number,
-  productId?: number,
 ): string => {
   // Convert product name to uppercase without spaces, limit to first 5 characters
   const words = productName
@@ -81,50 +83,28 @@ const generateSKU = (
 
   const nameSku = initials + lastWordConsonants;
 
-  // Size and Color attribute IDs from mock data
-  const SIZE_ATTR_ID = 1;
-  const COLOR_ATTR_ID = 2;
+  // Get attribute values from the actual data
+  const attrValueMap: Record<number, string> = {};
+  attributeValues.forEach((av) => {
+    // Get first 3 characters of value, uppercase
+    attrValueMap[av.id] = av.value.substring(0, 3).toUpperCase();
+  });
 
-  const sizeValue = attributes.find(
-    (a) => a.attributeId === SIZE_ATTR_ID,
-  )?.valueId;
-  const colorValue = attributes.find(
-    (a) => a.attributeId === COLOR_ATTR_ID,
-  )?.valueId;
+  // Build SKU with attribute values
+  const attrCodes = attributes
+    .map((a) => attrValueMap[a.valueId] || "")
+    .filter(Boolean);
 
-  // Get display values from mock attributes
-  const sizeMap: Record<number, string> = { 1: "M", 2: "L" };
-  const colorMap: Record<number, string> = {
-    3: "BLK",
-    4: "WHT",
-    5: "RED",
-    6: "BLU",
-    7: "GRN",
-    8: "YEL",
-    9: "ORG",
-    10: "PNK",
-    11: "GRY",
-    12: "BRN",
-    13: "NAV",
-    14: "BEG",
-    15: "CRM",
-    16: "SIL",
-    17: "GOL",
-    18: "MRN",
-  };
-
-  const size = sizeValue ? sizeMap[sizeValue] || "" : "";
-  const color = colorValue ? colorMap[colorValue] || "" : "";
-  console.log(color);
-
-  // Format: NAME-COLOR-SIZE (e.g., TSHIRT-WHT-L)
-  return `${nameSku}-${size}-${color}`.toUpperCase();
+  // Format: NAME-ATTR1-ATTR2-VARIANTNUM (e.g., TSHIRT-RED-BLK-1)
+  return `${nameSku}-${attrCodes.join("-")}-${variantIndex + 1}`.toUpperCase();
 };
 
 const CreateProductPage = () => {
   const router = useRouter();
   const { createProduct, updateProduct } = useProducts();
   const { categories, isLoading: isLoadingCategories } = useCategories();
+  const { attributes, isLoading: isLoadingAttributes } = useAttributes();
+  const { attributeValues, isLoading: isLoadingAttributeValues } = useAttributeValues();
   const { toast } = useToast();
 
   const {
@@ -210,7 +190,7 @@ const CreateProductPage = () => {
   useEffect(() => {
     if (variantsValue && variantsValue.length > 0) {
       variantsValue.forEach((variant, index) => {
-        const newSku = generateSKU(nameValue, variant.attributes || [], index);
+        const newSku = generateSKU(nameValue, variant.attributes || [], attributeValues, index);
         // Only update if SKU has changed
         if (previousSkusRef.current[index] !== newSku) {
           setValue(`variants.${index}.sku`, newSku);
@@ -223,7 +203,7 @@ const CreateProductPage = () => {
         };
       });
     }
-  }, [nameValue, variantsValue, setValue]);
+  }, [nameValue, variantsValue, attributeValues, setValue]);
 
   const handleNameChange = (value: string) => {
     const slug = value
@@ -285,8 +265,8 @@ const CreateProductPage = () => {
         const newSku = generateSKU(
           data.name,
           variantData?.attributes || [],
+          attributeValues,
           index,
-          createdProduct.id,
         );
 
         // Only send the fields that should be updated
@@ -329,25 +309,7 @@ const CreateProductPage = () => {
     }
   };
 
-  // Mock attributes - in real app, fetch from API
-  const mockAttributes = [
-    {
-      id: 1,
-      name: "Size",
-      values: [
-        { id: 1, name: "M" },
-        { id: 2, name: "L" },
-      ],
-    },
-    {
-      id: 2,
-      name: "Color",
-      values: [
-        { id: 3, name: "Black" },
-        { id: 4, name: "White" },
-      ],
-    },
-  ];
+  // Remove mock attributes and use real data from API
 
   return (
     <PageTransition>
@@ -581,7 +543,7 @@ const CreateProductPage = () => {
                     <div className="">
                       <Label className="text-sm mb-2 block">Attributes</Label>
                       <div className="grid gap-4 md:grid-cols-2">
-                        {mockAttributes.map((attr) => (
+                        {attributes.map((attr) => (
                           <div key={attr.id} className="space-y-2">
                             <Label className="">{attr.name}</Label>
                             <Controller
@@ -619,14 +581,16 @@ const CreateProductPage = () => {
                                       />
                                     </SelectTrigger>
                                     <SelectContent className="bg-white">
-                                      {attr.values.map((val) => (
-                                        <SelectItem
-                                          key={val.id}
-                                          value={String(val.id)}
-                                        >
-                                          {val.name}
-                                        </SelectItem>
-                                      ))}
+                                      {attributeValues
+                                        .filter((av) => av.attributeId === attr.id)
+                                        .map((val) => (
+                                          <SelectItem
+                                            key={val.id}
+                                            value={String(val.id)}
+                                          >
+                                            {val.value}
+                                          </SelectItem>
+                                        ))}
                                     </SelectContent>
                                   </Select>
                                 );

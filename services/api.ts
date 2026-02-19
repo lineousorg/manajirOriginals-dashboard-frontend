@@ -11,9 +11,17 @@ import {
 } from "@/types/category";
 import { Order, OrderStatus, UpdateOrderStatusInput } from "@/types/order";
 import { User } from "@/types/user";
+import {
+  Attribute,
+  CreateAttributeInput,
+  UpdateAttributeInput,
+  AttributeValue,
+  CreateAttributeValueInput,
+  UpdateAttributeValueInput,
+} from "@/types/attribute";
 
-// const API_BASE_URL = "http://localhost:5000/api"; // your backend
-const API_BASE_URL = "https://manajiroriginals.com/api";
+const API_BASE_URL = "http://localhost:5000/api"; // your backend
+// const API_BASE_URL = "https://manajiroriginals.com/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -168,6 +176,65 @@ export const usersApi = {
   getById: async (id: number): Promise<User> => {
     const response = await api.get(`/users/${id}`);
     return response.data.data;
+  },
+};
+
+// Attributes API
+export const attributesApi = {
+  getAll: async (): Promise<Attribute[]> => {
+    const response = await api.get("/attributes");
+    return response.data.data;
+  },
+
+  getById: async (id: number): Promise<Attribute> => {
+    const response = await api.get(`/attributes/${id}`);
+    return response.data.data;
+  },
+
+  create: async (data: CreateAttributeInput): Promise<Attribute> => {
+    const response = await api.post("/attributes", data);
+    return response.data.data;
+  },
+
+  update: async (id: number, data: UpdateAttributeInput): Promise<Attribute> => {
+    const response = await api.patch(`/attributes/${id}`, data);
+    return response.data.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/attributes/${id}`);
+  },
+};
+
+// Attribute Values API
+export const attributeValuesApi = {
+  getAll: async (): Promise<AttributeValue[]> => {
+    const response = await api.get("/attribute-values");
+    return response.data.data;
+  },
+
+  getById: async (id: number): Promise<AttributeValue> => {
+    const response = await api.get(`/attribute-values/${id}`);
+    return response.data.data;
+  },
+
+  getByAttributeId: async (attributeId: number): Promise<AttributeValue[]> => {
+    const response = await api.get(`/attribute-values/attribute/${attributeId}`);
+    return response.data.data;
+  },
+
+  create: async (data: CreateAttributeValueInput): Promise<AttributeValue> => {
+    const response = await api.post("/attribute-values", data);
+    return response.data.data;
+  },
+
+  update: async (id: number, data: UpdateAttributeValueInput): Promise<AttributeValue> => {
+    const response = await api.patch(`/attribute-values/${id}`, data);
+    return response.data.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/attribute-values/${id}`);
   },
 };
 
