@@ -12,8 +12,8 @@ import {
 import { Order, OrderStatus, UpdateOrderStatusInput } from "@/types/order";
 import { User } from "@/types/user";
 
-const API_BASE_URL = "http://localhost:5000/api"; // your backend
-// const API_BASE_URL = "https://manajiroriginals.com/api";
+// const API_BASE_URL = "http://localhost:5000/api"; // your backend
+const API_BASE_URL = "https://manajiroriginals.com/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
