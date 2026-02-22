@@ -22,6 +22,9 @@ export interface ProductVariant {
   stock: number;
   productId: number;
   attributes: VariantAttribute[];
+  isActive: boolean;
+  isDeleted: boolean;
+  deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +37,8 @@ export interface Product {
   description: string;
   brand: string | null;
   isActive: boolean;
+  isDeleted: boolean;
+  deletedAt: string | null;
   categoryId: number;
   category: ProductCategory;
   variants: ProductVariant[];
@@ -63,6 +68,7 @@ export interface CreateVariantInput {
   price: number;
   stock: number;
   attributes?: VariantAttribute[];
+  isActive?: boolean;
 }
 
 export interface UpdateProductInput extends Partial<CreateProductInput> {

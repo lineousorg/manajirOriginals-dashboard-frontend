@@ -20,8 +20,8 @@ import {
   UpdateAttributeValueInput,
 } from "@/types/attribute";
 
-// const API_BASE_URL = "http://localhost:5000/api"; // your backend
-const API_BASE_URL = "https://manajiroriginals.com/api";
+const API_BASE_URL = "http://localhost:5000/api"; // your backend
+// const API_BASE_URL = "https://manajiroriginals.com/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -102,6 +102,28 @@ export const productsApi = {
   },
   delete: async (id: number): Promise<void> => {
     await api.delete(`/products/${id}`);
+  },
+  // Toggle product active status
+  toggleActive: async (id: number): Promise<Product> => {
+    const response = await api.patch(`/products/${id}/toggle-active`);
+    return response.data.data;
+  },
+  // Toggle variant active status
+  toggleVariantActive: async (
+    productId: number,
+    variantId: number,
+  ): Promise<Product> => {
+    const response = await api.patch(
+      `/products/${productId}/variants/${variantId}/toggle-active`,
+    );
+    return response.data.data;
+  },
+  // Soft delete variant
+  deleteVariant: async (
+    productId: number,
+    variantId: number,
+  ): Promise<void> => {
+    await api.delete(`/products/${productId}/variants/${variantId}`);
   },
 };
 

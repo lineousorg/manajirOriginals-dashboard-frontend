@@ -78,9 +78,68 @@ export const useProducts = () => {
     setError(null);
     try {
       await productsApi.delete(id);
+      // For soft delete, we filter out the product from the local state
+      // The API now returns products without deleted ones
       setProducts((prev) => prev.filter((p) => p.id !== id));
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to delete product");
+      throw err;
+    }
+  };
+
+  // Toggle product active status
+  const toggleProductActive = async (id: number): Promise<Product> => {
+    setError(null);
+    try {
+      const updated = await productsApi.toggleActive(id);
+      setProducts((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      return updated;
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Failed to toggle product status");
+      throw err;
+    }
+  };
+
+  // Toggle variant active status
+  const toggleVariantActive = async (
+    productId: number,
+    variantId: number,
+  ): Promise<Product> => {
+    setError(null);
+    try {
+      const updated = await productsApi.toggleVariantActive(productId, variantId);
+      setProducts((prev) =>
+        prev.map((p) => (p.id === productId ? updated : p)),
+      );
+      return updated;
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Failed to toggle variant status");
+      throw err;
+    }
+  };
+
+  // Soft delete variant
+  const deleteVariant = async (
+    productId: number,
+    variantId: number,
+  ): Promise<void> => {
+    setError(null);
+    try {
+      await productsApi.deleteVariant(productId, variantId);
+      // Update local state to remove the variant
+      setProducts((prev) =>
+        prev.map((p) => {
+          if (p.id === productId) {
+            return {
+              ...p,
+              variants: p.variants.filter((v) => v.id !== variantId),
+            };
+          }
+          return p;
+        }),
+      );
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Failed to delete variant");
       throw err;
     }
   };
@@ -94,5 +153,8 @@ export const useProducts = () => {
     updateProduct,
     patchProduct,
     deleteProduct,
+    toggleProductActive,
+    toggleVariantActive,
+    deleteVariant,
   };
 };

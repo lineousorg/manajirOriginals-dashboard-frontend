@@ -52,16 +52,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { StatusBadge } from "@/components/ui/badge-status";
 import { TableSkeleton } from "@/components/ui/skeleton-card";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
+import { Switch } from "@/components/ui/switch";
 
 const ProductsPage = () => {
-  const { products, isLoading, deleteProduct } = useProducts();
+  const { products, isLoading, deleteProduct, toggleProductActive, toggleVariantActive } =
+    useProducts();
   const { categories } = useCategories();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<number | "all">("all");
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [togglingVariantId, setTogglingVariantId] = useState<number | null>(null);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
@@ -83,6 +86,45 @@ const ProductsPage = () => {
   const handleDeleteClick = (product: Product) => {
     setProductToDelete(product);
     setDeleteDialogOpen(true);
+  };
+
+  const handleToggleActive = async (product: Product) => {
+    setTogglingId(product.id);
+    try {
+      await toggleProductActive(product.id);
+      toast({
+        title: product.isActive ? "Product deactivated" : "Product activated",
+        description: `${product?.name} has been ${product.isActive ? "deactivated" : "activated"} successfully.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to toggle product status. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  const handleToggleVariantActive = async (product: Product, variantId: number) => {
+    setTogglingVariantId(variantId);
+    try {
+      await toggleVariantActive(product.id, variantId);
+      const variant = product.variants.find((v) => v.id === variantId);
+      toast({
+        title: variant?.isActive ? "Variant deactivated" : "Variant activated",
+        description: `Variant has been ${variant?.isActive ? "deactivated" : "activated"} successfully.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to toggle variant status. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setTogglingVariantId(null);
+    }
   };
 
   const handleDeleteConfirm = async () => {
@@ -217,7 +259,9 @@ const ProductsPage = () => {
                               {product.images && product.images.length > 0 ? (
                                 <img
                                   src={product.images[0].url}
-                                  alt={product.images[0].altText || product.name}
+                                  alt={
+                                    product.images[0].altText || product.name
+                                  }
                                   className="w-full h-full object-cover"
                                 />
                               ) : (
@@ -234,7 +278,7 @@ const ProductsPage = () => {
                         </TableCell>
                         <TableCell>
                           <span className="text-sm">
-                            {product?.category.name}
+                            {product?.category?.name}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -244,15 +288,31 @@ const ProductsPage = () => {
                         </TableCell>
 
                         <TableCell>
-                          <StatusBadge
-                            status={product.isActive ? "active" : "inactive"}
-                          />
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={product.isActive}
+                              onCheckedChange={() =>
+                                handleToggleActive(product)
+                              }
+                              disabled={togglingId === product.id}
+                              className="data-[state=checked]:bg-green-700 data-[state=unchecked]:bg-muted"
+                            />
+                            <span
+                              className={`text-xs font-medium ${
+                                product.isActive
+                                  ? "text-success"
+                                  : "text-muted-foreground"
+                              }`}
+                            >
+                              {product.isActive ? "Active" : "Inactive"}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell>
                           <HoverCard>
                             <HoverCardTrigger asChild>
                               <span className="text-sm text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                                {product.variants.length} variant(s)
+                                {product?.variants?.length} variant(s)
                               </span>
                             </HoverCardTrigger>
                             <HoverCardContent className="w-80 p-3 bg-white">
@@ -261,14 +321,22 @@ const ProductsPage = () => {
                                   Variants
                                 </h4>
                                 <div className="max-h-48 overflow-y-auto space-y-1">
-                                  {product.variants.map((variant) => (
+                                  {product?.variants?.map((variant) => (
                                     <div
                                       key={variant.id}
-                                      className="flex justify-between items-center text-xs p-1.5 bg-muted/50 rounded"
+                                      className="flex justify-between items-center text-xs p-1.5 bg-muted/50 rounded gap-2"
                                     >
-                                      <span className="font-medium">
-                                        {variant.sku}
-                                      </span>
+                                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <Switch
+                                          checked={variant.isActive}
+                                          onCheckedChange={() => handleToggleVariantActive(product, variant.id)}
+                                          disabled={togglingVariantId === variant.id}
+                                          className="h-4 w-7 data-[state=checked]:bg-green-700 data-[state=unchecked]:bg-muted"
+                                        />
+                                        <span className="font-medium truncate">
+                                          {variant.sku}
+                                        </span>
+                                      </div>
                                       <div className="flex items-center gap-2">
                                         <span className="text-muted-foreground">
                                           ${Number(variant.price).toFixed(2)}
