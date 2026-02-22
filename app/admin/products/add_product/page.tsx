@@ -101,7 +101,7 @@ const generateSKU = (
 
 const CreateProductPage = () => {
   const router = useRouter();
-  const { createProduct, updateProduct } = useProducts();
+  const { createProduct } = useProducts();
   const { categories, isLoading: isLoadingCategories } = useCategories();
   const { attributes, isLoading: isLoadingAttributes } = useAttributes();
   const { attributeValues, isLoading: isLoadingAttributeValues } = useAttributeValues();
@@ -238,48 +238,8 @@ const CreateProductPage = () => {
       // Create product and get the response with productId
       const createdProduct = await createProduct(productData);
 
-      // Regenerate SKUs with actual productId
-      // const updatedVariants = createdProduct.variants.map((variant, index) => {
-      //   const variantData = generatedSKUsRef.current.find(
-      //     (v) => v.index === index,
-      //   );
-      //   const newSku = generateSKU(
-      //     data.name,
-      //     variantData?.attributes || [],
-      //     index,
-      //     createdProduct.id,
-      //   );
-      //   return {
-      //     ...variant,
-      //     sku: newSku,
-      //   };
-      // });
-
-      // // Update product with correct SKUs
-      // await updateProduct(createdProduct.id, { variants: updatedVariants });
-
-      const updatedVariants = createdProduct.variants.map((variant, index) => {
-        const variantData = generatedSKUsRef.current.find(
-          (v) => v.index === index,
-        );
-        const newSku = generateSKU(
-          data.name,
-          variantData?.attributes || [],
-          attributeValues,
-          index,
-        );
-
-        // Only send the fields that should be updated
-        return {
-          // id: variant.id, // Need the ID to know which variant to update
-          sku: newSku,
-          price: variant.price,
-          stock: variant.stock,
-        };
-      });
-
-      // Update only sends sku, price, stock - NOT id, productId, createdAt, updatedAt
-      await updateProduct(createdProduct.id, { variants: updatedVariants });
+      // Note: SKUs are already generated client-side during form input
+      // and included in the initial POST request, so no additional PATCH is needed
 
       toast({
         title: "Product created",
