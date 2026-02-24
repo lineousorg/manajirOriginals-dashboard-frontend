@@ -27,5 +27,5 @@ export const useProduct = (id?: number) => {
     fetchProduct();
   }, [id]);
 
-  return { product, isLoading, error };
+  return { product, isLoading, error, setProduct };
 };
