@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "Ecom Admin Hub",
-  description: "Admin dashboard for e-commerce management",
+  title: "Manajir Originals Dashboard",
+  description: "Admin dashboard for managing Manajir Originals products, categories, attributes, and more.",
 };
 
 export default function RootLayout({
