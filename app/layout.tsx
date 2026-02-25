@@ -9,6 +9,7 @@ export const metadata = {
   description: "Admin dashboard for managing Manajir Originals products, categories, attributes, and more.",
 };
 
+
 export default function RootLayout({
   children,
 }: {
