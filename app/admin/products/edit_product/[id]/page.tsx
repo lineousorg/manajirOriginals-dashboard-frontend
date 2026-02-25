@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useFieldArray, useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -24,12 +26,18 @@ import { useParams, useRouter } from "next/navigation";
 import { useProducts } from "@/hooks/useProducts";
 import { useProduct } from "@/hooks/useProduct";
 import { useCategories } from "@/hooks/useCategories";
+import { useAttributes } from "@/hooks/useAttributes";
+import { useAttributeValues } from "@/hooks/useAttributeValues";
 
 // Variant schema matching backend structure
 const variantSchema = z.object({
   sku: z.string().min(1, "SKU is required"),
   price: z.number().min(0, "Price must be positive"),
   stock: z.number().min(0, "Stock must be positive"),
+  attributes: z.array(z.object({
+    attributeId: z.number(),
+    valueId: z.number(),
+  })).optional().default([]),
 });
 
 // Image schema
@@ -55,10 +63,13 @@ const EditProductPage = () => {
   const stringId = params?.id;
   const id = Number(stringId);
   const router = useRouter();
-  const { product, isLoading: isLoadingProduct, error } = useProduct(id);
-  const { updateProduct } = useProducts();
+  const { product, isLoading: isLoadingProduct, error, setProduct } = useProduct(id);
+  const { updateProduct, toggleVariantActive } = useProducts();
   const { categories, isLoading: isLoadingCategories } = useCategories();
+  const { attributes, isLoading: isLoadingAttributes } = useAttributes();
+  const { attributeValues, isLoading: isLoadingAttributeValues } = useAttributeValues();
   const { toast } = useToast();
+  const [togglingVariantId, setTogglingVariantId] = useState<number | null>(null);
 
   const {
     register,
@@ -74,7 +85,7 @@ const EditProductPage = () => {
       name: "",
       description: "",
       categoryId: 0,
-      variants: [{ sku: "", price: 0, stock: 0 }],
+      variants: [{ sku: "", price: 0, stock: 0, attributes: [] }],
       images: [],
     },
   });
@@ -131,6 +142,7 @@ const EditProductPage = () => {
           sku: v.sku || "",
           price: v.price,
           stock: v.stock,
+          attributes: v.attributes || [],
         })),
         images: product.images || [],
       });
@@ -149,6 +161,7 @@ const EditProductPage = () => {
           sku: v.sku,
           price: v.price,
           stock: v.stock,
+          attributes: v.attributes || [],
         })),
         images: data.images
           .filter((img) => img.url && img.url.trim() !== "")
@@ -172,6 +185,40 @@ const EditProductPage = () => {
         description: "Failed to update product. Please try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleToggleVariantActive = async (variantId: number) => {
+    setTogglingVariantId(variantId);
+    try {
+      await toggleVariantActive(id, variantId);
+      // Get the current variant state before updating
+      const currentVariant = product?.variants.find((v) => v.id === variantId);
+      const newIsActive = !currentVariant?.isActive;
+      
+      // Update local state to reflect the change immediately
+      setProduct((prevProduct) => {
+        if (!prevProduct) return null;
+        return {
+          ...prevProduct,
+          variants: prevProduct.variants.map((v) =>
+            v.id === variantId ? { ...v, isActive: newIsActive } : v
+          ),
+        };
+      });
+      
+      toast({
+        title: currentVariant?.isActive ? "Variant deactivated" : "Variant activated",
+        description: `Variant has been ${currentVariant?.isActive ? "deactivated" : "activated"} successfully.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to toggle variant status. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setTogglingVariantId(null);
     }
   };
 
@@ -316,7 +363,7 @@ const EditProductPage = () => {
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    append({ sku: "", price: 0, stock: 0 })
+                    append({ sku: "", price: 0, stock: 0, attributes: [] })
                   }
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -339,6 +386,33 @@ const EditProductPage = () => {
                     exit={{ opacity: 0, x: -20 }}
                     className="grid gap-4 md:grid-cols-5 p-4 bg-muted/50 rounded-lg relative"
                   >
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <div className="flex items-center gap-2 h-10">
+                        {product.variants[index]?.id ? (
+                          <>
+                            <Switch
+                              checked={product.variants[index]?.isActive ?? true}
+                              onCheckedChange={() => handleToggleVariantActive(product.variants[index]?.id)}
+                              disabled={togglingVariantId === product.variants[index]?.id}
+                              className="data-[state=checked]:bg-green-700 data-[state=unchecked]:bg-muted"
+                            />
+                            <span
+                              className={`text-xs font-medium ${
+                                product.variants[index]?.isActive
+                                  ? "text-success"
+                                  : "text-muted-foreground"
+                              }`}
+                            >
+                              {product.variants[index]?.isActive ? "Active" : "Inactive"}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">New</span>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="space-y-2">
                       <Label>SKU</Label>
                       <Input
@@ -398,6 +472,68 @@ const EditProductPage = () => {
                           {errors.variants[index]?.stock?.message}
                         </p>
                       )}
+                    </div>
+
+                    {/* Attributes Section */}
+                    <div className="md:col-span-6">
+                      <Label className="text-sm mb-2 block">Attributes</Label>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {attributes.map((attr) => (
+                          <div key={attr.id} className="space-y-2">
+                            <Label className="">{attr.name}</Label>
+                            <Controller
+                              name={`variants.${index}.attributes`}
+                              control={control}
+                              render={({ field: attributeField }) => {
+                                const currentAttr = attributeField.value?.find(
+                                  (a: { attributeId: number }) =>
+                                    a.attributeId === attr.id,
+                                );
+                                return (
+                                  <Select
+                                    value={
+                                      currentAttr
+                                        ? String(currentAttr.valueId)
+                                        : ""
+                                    }
+                                    onValueChange={(val) => {
+                                      const newAttrs = (
+                                        attributeField.value || []
+                                      ).filter(
+                                        (a: { attributeId: number }) =>
+                                          a.attributeId !== attr.id,
+                                      );
+                                      newAttrs.push({
+                                        attributeId: attr.id,
+                                        valueId: Number(val),
+                                      });
+                                      attributeField.onChange(newAttrs);
+                                    }}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue
+                                        placeholder={`Select ${attr.name}`}
+                                      />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-white">
+                                      {attributeValues
+                                        .filter((av) => av.attributeId === attr.id)
+                                        .map((val) => (
+                                          <SelectItem
+                                            key={val.id}
+                                            value={String(val.id)}
+                                          >
+                                            {val.value}
+                                          </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                  </Select>
+                                );
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="flex items-end">
