@@ -1,7 +1,7 @@
 services:
   frontend-dev:
     image: lineousreza/lineousrepo:dashboard-manajir-dev
-    container_name: frontend-manajir-dev
+    container_name: dashboard-manajir-dev
     restart: always
     ports:
       - "3023:3000"
