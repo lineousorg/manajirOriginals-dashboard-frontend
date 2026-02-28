@@ -10,9 +10,13 @@ import {
 } from "lucide-react";
 import { PageTransition, FadeIn, ScaleOnHover } from "@/components/ui/motion";
 import { useProducts } from "@/hooks/useProducts";
+import { useOrders } from "@/hooks/useOrders";
+import { useUsers } from "@/hooks/useUsers";
 
 export default function DashboardPage() {
   const { products } = useProducts();
+  const { orders } = useOrders();
+  const { users } = useUsers();
 
   const stats = [
     {
@@ -24,21 +28,21 @@ export default function DashboardPage() {
     },
     {
       title: "Total Orders",
-      value: 0,
+      value: `${orders.length}`,
       change: "0%",
       isPositive: true,
       icon: ShoppingCart,
     },
     {
       title: "Total Customers",
-      value: 0,
+      value: `${orders.length}`,
       change: "+0%",
       isPositive: true,
       icon: Users,
     },
     {
-      title: "Revenue",
-      value: 0,
+      title: "Registered Users",
+      value: `${users.length}`,
       change: "0%",
       isPositive: false,
       icon: TrendingUp,

@@ -9,7 +9,6 @@ import {
   User,
   CreditCard,
   Calendar,
-  X,
   Loader2,
   Download,
 } from "lucide-react";
@@ -34,9 +33,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableSkeleton } from "@/components/ui/skeleton-card";
-import { Modal } from "@/components/ui/modal";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import Modal from "@/components/ui/modal";
+import { Clock, Truck, PackageCheck, Ban } from "lucide-react";
 
 // Order status badge styles
 const orderStatusStyles: Record<OrderStatus, string> = {
@@ -145,7 +146,9 @@ const OrderDetailsModal = ({
                 <span className="text-sm font-medium">Customer</span>
               </div>
               <p className="font-medium">{order.user.email}</p>
-              <p className="text-sm text-muted-foreground">ID: {order.userId}</p>
+              {/* <p className="text-sm text-muted-foreground">
+                ID: {order.userId}
+              </p> */}
             </div>
 
             {/* Status */}
@@ -248,7 +251,9 @@ const OrderDetailsModal = ({
           <div className="flex justify-end border-t pt-4">
             <div className="text-right">
               <p className="text-sm text-muted-foreground">Total</p>
-              <p className="text-2xl font-bold">{formatCurrency(order.total)}</p>
+              <p className="text-2xl font-bold">
+                {formatCurrency(order.total)}
+              </p>
             </div>
           </div>
         </div>
@@ -268,22 +273,46 @@ const OrdersPage = () => {
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
 
   // Download receipt state
-  const [downloadingReceipt, setDownloadingReceipt] = useState<number | null>(null);
+  const [downloadingReceipt, setDownloadingReceipt] = useState<number | null>(
+    null
+  );
 
   const filteredOrders = useMemo(() => {
     if (!Array.isArray(orders)) return [];
     return orders.filter((order) => {
-      const matchesSearch = 
+      const matchesSearch =
         order.id.toString().includes(searchQuery.toLowerCase()) ||
         order.user.email.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus = 
+      const matchesStatus =
         statusFilter === "all" || order.status === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
   }, [orders, searchQuery, statusFilter]);
 
-  const handleStatusChange = async (orderId: number, newStatus: OrderStatus) => {
+  // Calculate order stats by status
+  const orderStats = useMemo(() => {
+    const stats: Record<OrderStatus, number> = {
+      PENDING: 0,
+      PAID: 0,
+      SHIPPED: 0,
+      DELIVERED: 0,
+      CANCELLED: 0,
+    };
+    if (Array.isArray(orders)) {
+      orders.forEach((order) => {
+        if (order.status in stats) {
+          stats[order.status]++;
+        }
+      });
+    }
+    return stats;
+  }, [orders]);
+
+  const handleStatusChange = async (
+    orderId: number,
+    newStatus: OrderStatus
+  ) => {
     try {
       await updateOrderStatus(orderId, { status: newStatus });
       toast({
@@ -293,7 +322,9 @@ const OrdersPage = () => {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update order status. Please try again.",
+        description:
+          (error as string) ||
+          "Failed to update order status. Please try again.",
         variant: "destructive",
       });
     }
@@ -340,9 +371,100 @@ const OrdersPage = () => {
     });
   };
 
+  const colorVariants = {
+    amber: {
+      bg: "bg-amber-50",
+      text: "text-amber-400",
+      textStrong: "text-amber-500",
+      accent: "bg-amber-500",
+    },
+    blue: {
+      bg: "bg-blue-50",
+      text: "text-blue-400",
+      textStrong: "text-blue-500",
+      accent: "bg-blue-500",
+    },
+    violet: {
+      bg: "bg-violet-50",
+      text: "text-violet-400",
+      textStrong: "text-violet-500",
+      accent: "bg-violet-500",
+    },
+    emerald: {
+      bg: "bg-emerald-50",
+      text: "text-emerald-400",
+      textStrong: "text-emerald-500",
+      accent: "bg-emerald-500",
+    },
+    rose: {
+      bg: "bg-rose-50",
+      text: "text-rose-400",
+      textStrong: "text-rose-500",
+      accent: "bg-rose-500",
+    },
+  };
   return (
     <PageTransition>
       <div className="space-y-6">
+        {/* Quick stats - Minimal Elegant Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {[
+            {
+              status: "PENDING",
+              label: "Pending",
+              icon: Clock,
+              color: "amber",
+            },
+            { status: "PAID", label: "Paid", icon: CreditCard, color: "blue" },
+            {
+              status: "SHIPPED",
+              label: "Shipped",
+              icon: Truck,
+              color: "violet",
+            },
+            {
+              status: "DELIVERED",
+              label: "Delivered",
+              icon: PackageCheck,
+              color: "emerald",
+            },
+            {
+              status: "CANCELLED",
+              label: "Cancelled",
+              icon: Ban,
+              color: "rose",
+            },
+          ].map(({ status, label, icon: Icon, color }) => (
+            <Card
+              key={status}
+              className="group relative border-0 shadow-sm hover:shadow-md transition-all duration-200 bg-white"
+            >
+              <CardContent className="p-3 overflow-hidden">
+                <div className="flex items-center justify-end relative">
+                  {/* Icon */}
+                  <div
+                    className={`rounded-xl bg-${color}-50 text-${color}-600 absolute -left-7 `}
+                  >
+                    <Icon size={50} strokeWidth={2} />
+                  </div>
+
+                  <div className="mt-4 text-right">
+                    <p className={`text-2xl font-semibold text-${color}-700`}>
+                      {orderStats[status].toLocaleString()}
+                    </p>
+                    <p className="text-sm text-slate-500 mt-0.5">{label}</p>
+                  </div>
+                </div>
+
+                {/* Subtle bottom accent */}
+                <div
+                  className={`absolute bottom-0 left-0 right-0 h-1 bg-${color}-500 opacity-0 group-hover:opacity-100 transition-opacity rounded-b-lg`}
+                />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
         {/* Header */}
         <FadeIn>
           <div>
@@ -452,19 +574,27 @@ const OrdersPage = () => {
                             </SelectTrigger>
                             <SelectContent className="bg-white">
                               <SelectItem value={OrderStatus.PENDING}>
-                                <OrderStatusBadge status={OrderStatus.PENDING} />
+                                <OrderStatusBadge
+                                  status={OrderStatus.PENDING}
+                                />
                               </SelectItem>
                               <SelectItem value={OrderStatus.PAID}>
                                 <OrderStatusBadge status={OrderStatus.PAID} />
                               </SelectItem>
                               <SelectItem value={OrderStatus.SHIPPED}>
-                                <OrderStatusBadge status={OrderStatus.SHIPPED} />
+                                <OrderStatusBadge
+                                  status={OrderStatus.SHIPPED}
+                                />
                               </SelectItem>
                               <SelectItem value={OrderStatus.DELIVERED}>
-                                <OrderStatusBadge status={OrderStatus.DELIVERED} />
+                                <OrderStatusBadge
+                                  status={OrderStatus.DELIVERED}
+                                />
                               </SelectItem>
                               <SelectItem value={OrderStatus.CANCELLED}>
-                                <OrderStatusBadge status={OrderStatus.CANCELLED} />
+                                <OrderStatusBadge
+                                  status={OrderStatus.CANCELLED}
+                                />
                               </SelectItem>
                             </SelectContent>
                           </Select>

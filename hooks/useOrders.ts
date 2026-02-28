@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-"use client"
+"use client";
 import { useState, useEffect, useCallback } from "react";
 import { Order, OrderStatus, UpdateOrderStatusInput } from "@/types/order";
 import { ordersApi } from "@/services/api";
@@ -48,8 +48,9 @@ export const useOrders = () => {
       setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
       return updated;
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to update order status");
-      throw err;
+      console.log(err);
+      setError(err?.response?.data?.message);
+      throw err?.response?.data?.message;
     }
   };
 
