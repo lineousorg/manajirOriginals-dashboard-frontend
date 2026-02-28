@@ -371,7 +371,14 @@ const OrdersPage = () => {
     });
   };
 
-  const colorVariants = {
+  type ColorVariant = "amber" | "blue" | "violet" | "emerald" | "rose";
+
+  const colorVariants: Record<ColorVariant, {
+    bg: string;
+    text: string;
+    textStrong: string;
+    accent: string;
+  }> = {
     amber: {
       bg: "bg-amber-50",
       text: "text-amber-400",
@@ -408,61 +415,64 @@ const OrdersPage = () => {
       <div className="space-y-6">
         {/* Quick stats - Minimal Elegant Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {[
+          {([
             {
               status: "PENDING",
               label: "Pending",
               icon: Clock,
-              color: "amber",
+              color: "amber" as ColorVariant,
             },
-            { status: "PAID", label: "Paid", icon: CreditCard, color: "blue" },
+            { status: "PAID", label: "Paid", icon: CreditCard, color: "blue" as ColorVariant },
             {
               status: "SHIPPED",
               label: "Shipped",
               icon: Truck,
-              color: "violet",
+              color: "violet" as ColorVariant,
             },
             {
               status: "DELIVERED",
               label: "Delivered",
               icon: PackageCheck,
-              color: "emerald",
+              color: "emerald" as ColorVariant,
             },
             {
               status: "CANCELLED",
               label: "Cancelled",
               icon: Ban,
-              color: "rose",
+              color: "rose" as ColorVariant,
             },
-          ].map(({ status, label, icon: Icon, color }) => (
-            <Card
-              key={status}
-              className="group relative border-0 shadow-sm hover:shadow-md transition-all duration-200 bg-white"
-            >
-              <CardContent className="p-3 overflow-hidden">
-                <div className="flex items-center justify-end relative">
-                  {/* Icon */}
+          ] as { status: string; label: string; icon: React.ComponentType<{ size?: number; strokeWidth?: number }>; color: ColorVariant }[]).map(({ status, label, icon: Icon, color }) => {
+            const colors = colorVariants[color] || colorVariants.amber;
+            return (
+              <Card
+                key={status}
+                className="group relative border-0 shadow-sm hover:shadow-md transition-all duration-200 bg-white"
+              >
+                <CardContent className="p-3 overflow-hidden">
+                  <div className="flex items-center justify-end relative">
+                    {/* Icon */}
+                    <div
+                      className={`rounded-xl ${colors.bg} ${colors.text} absolute -left-7 `}
+                    >
+                      <Icon size={50} strokeWidth={2} />
+                    </div>
+
+                    <div className="mt-4 text-right">
+                      <p className={`text-2xl font-semibold ${colors.textStrong}`}>
+                        {(orderStats[status as OrderStatus] ?? 0).toLocaleString()}
+                      </p>
+                      <p className="text-sm text-slate-500 mt-0.5">{label}</p>
+                    </div>
+                  </div>
+
+                  {/* Subtle bottom accent */}
                   <div
-                    className={`rounded-xl bg-${color}-50 text-${color}-600 absolute -left-7 `}
-                  >
-                    <Icon size={50} strokeWidth={2} />
-                  </div>
-
-                  <div className="mt-4 text-right">
-                    <p className={`text-2xl font-semibold text-${color}-700`}>
-                      {orderStats[status].toLocaleString()}
-                    </p>
-                    <p className="text-sm text-slate-500 mt-0.5">{label}</p>
-                  </div>
-                </div>
-
-                {/* Subtle bottom accent */}
-                <div
-                  className={`absolute bottom-0 left-0 right-0 h-1 bg-${color}-500 opacity-0 group-hover:opacity-100 transition-opacity rounded-b-lg`}
-                />
-              </CardContent>
-            </Card>
-          ))}
+                    className={`absolute bottom-0 left-0 right-0 h-1 ${colors.accent} opacity-0 group-hover:opacity-100 transition-opacity rounded-b-lg`}
+                  />
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Header */}
