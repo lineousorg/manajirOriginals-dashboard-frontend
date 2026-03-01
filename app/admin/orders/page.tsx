@@ -413,6 +413,13 @@ const OrdersPage = () => {
   return (
     <PageTransition>
       <div className="space-y-6">
+        {/* Header */}
+        <FadeIn>
+          <div>
+            <h1 className="text-2xl font-bold">Orders</h1>
+            <p className="text-muted-foreground">Manage your customer orders</p>
+          </div>
+        </FadeIn>
         {/* Quick stats - Minimal Elegant Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {([
@@ -475,13 +482,7 @@ const OrdersPage = () => {
           })}
         </div>
 
-        {/* Header */}
-        <FadeIn>
-          <div>
-            <h1 className="text-2xl font-bold">Orders</h1>
-            <p className="text-muted-foreground">Manage your customer orders</p>
-          </div>
-        </FadeIn>
+
 
         {/* Filters */}
         <FadeIn delay={0.1} className="flex flex-col sm:flex-row gap-4">
