@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   CornerDownRight,
+  Pencil,
 } from "lucide-react";
 import { useCategories } from "@/hooks/useCategories";
 import { PageTransition, FadeIn } from "@/components/ui/motion";
@@ -50,13 +51,14 @@ import {
 import { Label } from "@/components/ui/label";
 import { TableSkeleton } from "@/components/ui/skeleton-card";
 import { useToast } from "@/hooks/use-toast";
-import { CreateCategoryInput } from "@/types/category";
+import { CreateCategoryInput, CategoryImage, Category } from "@/types/category";
 
 const CategoriesPage = () => {
   const {
     categories,
     isLoading,
     createCategory,
+    updateCategory,
     deleteCategory,
   } = useCategories();
   const [searchQuery, setSearchQuery] = useState("");
@@ -65,6 +67,13 @@ const CategoriesPage = () => {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newSlug, setNewSlug] = useState("");
   const [newParentId, setNewParentId] = useState<number | null>(null);
+  const [newImages, setNewImages] = useState<CategoryImage[]>([]);
+
+  // Edit category state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [categoryToEdit, setCategoryToEdit] = useState<Category | null>(null);
+  const [editCategoryName, setEditCategoryName] = useState("");
+  const [editImages, setEditImages] = useState<CategoryImage[]>([]);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<number | null>(null);
@@ -72,6 +81,113 @@ const CategoriesPage = () => {
   const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
 
   const { toast } = useToast();
+
+  // Convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // Handle image file selection
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const base64 = await fileToBase64(file);
+        setNewImages((prev) => [
+          ...prev,
+          {
+            url: base64,
+            altText: file.name,
+            position: prev.length + i,
+          },
+        ]);
+      } catch (error) {
+        console.error("Error converting file to base64:", error);
+      }
+    }
+  };
+
+  // Remove image
+  const removeImage = (index: number) => {
+    setNewImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Handle edit image file selection
+  const handleEditImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const base64 = await fileToBase64(file);
+        setEditImages((prev) => [
+          ...prev,
+          {
+            url: base64,
+            altText: file.name,
+            position: prev.length + i,
+          },
+        ]);
+      } catch (error) {
+        console.error("Error converting file to base64:", error);
+      }
+    }
+  };
+
+  // Remove edit image
+  const removeEditImage = (index: number) => {
+    setEditImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Handle update category
+  const handleUpdateCategory = async () => {
+    if (!categoryToEdit) return;
+
+    if (!editCategoryName.trim()) {
+      toast({
+        title: "Error",
+        description: "Category name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await updateCategory(categoryToEdit.id, {
+        name: editCategoryName,
+        images: editImages.map((img, index) => ({
+          url: img.url,
+          altText: img.altText,
+          position: index,
+        })),
+      });
+      toast({
+        title: "Category updated",
+        description: `${editCategoryName} has been updated successfully.`,
+      });
+      setEditDialogOpen(false);
+      setCategoryToEdit(null);
+      setEditCategoryName("");
+      setEditImages([]);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      const backendMessage = err?.response?.data?.message;
+      toast({
+        title: "Error",
+        description: backendMessage || "Failed to update category. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Helper function to generate slug from name
   const generateSlug = (name: string): string => {
@@ -120,6 +236,11 @@ const CategoriesPage = () => {
         name: newCategoryName,
         slug: newSlug,
         parentId: newParentId,
+        images: newImages.map((img, index) => ({
+          url: img.url,
+          altText: img.altText,
+          position: index,
+        })),
       };
 
       await createCategory(input);
@@ -131,6 +252,7 @@ const CategoriesPage = () => {
       setNewCategoryName("");
       setNewSlug("");
       setNewParentId(null);
+      setNewImages([]);
     } catch (error) {
       console.log(error);
       toast({
@@ -146,6 +268,13 @@ const CategoriesPage = () => {
     setDeleteDialogOpen(true);
   };
 
+  const handleEditClick = (category: Category) => {
+    setCategoryToEdit(category);
+    setEditCategoryName(category.name);
+    setEditImages(category.images || []);
+    setEditDialogOpen(true);
+  };
+
   const handleDeleteConfirm = async () => {
     if (categoryToDelete) {
       try {
@@ -155,11 +284,12 @@ const CategoriesPage = () => {
           title: "Category deleted",
           description: `${category?.name} has been deleted successfully.`,
         });
-      } catch (error) {
-        console.log(error);
+      } catch (error: unknown) {
+        const err = error as { response?: { data?: { message?: string } } };
+        const backendMessage = err?.response?.data?.message;
         toast({
           title: "Error",
-          description: "Failed to delete category. Please try again.",
+          description: backendMessage || "Failed to delete category. Please try again.",
           variant: "destructive",
         });
       }
@@ -180,6 +310,7 @@ const CategoriesPage = () => {
     const hasChildren = category.children && category.children.length > 0;
     const isExpanded = expandedCategory === category.id;
     const productCount = category._count?.products || 0;
+    const categoryImage = category.images && category.images.length > 0 ? category.images[0] : null;
 
     return (
       <AnimatePresence key={category.id} mode="popLayout">
@@ -213,13 +344,23 @@ const CategoriesPage = () => {
               {level > 0 && (
                 <CornerDownRight className="w-4 h-4 text-muted-foreground" />
               )}
-              <div
-                className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                  level > 0 ? "bg-muted/50" : "bg-accent/10"
-                }`}
-              >
-                <FolderTree className={`w-5 h-5 ${level > 0 ? "text-muted-foreground" : "text-accent"}`} />
-              </div>
+              {categoryImage ? (
+                <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                  <img
+                    src={categoryImage.url}
+                    alt={categoryImage.altText || category.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div
+                  className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    level > 0 ? "bg-muted/50" : "bg-accent/10"
+                  }`}
+                >
+                  <FolderTree className={`w-5 h-5 ${level > 0 ? "text-muted-foreground" : "text-accent"}`} />
+                </div>
+              )}
               <div>
                 <p className="font-medium">{category.name}</p>
                 <p className="text-sm text-muted-foreground">
@@ -252,6 +393,12 @@ const CategoriesPage = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => handleEditClick(category)}
+                >
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => handleDeleteClick(category.id)}
                   className="text-destructive focus:text-destructive"
@@ -357,7 +504,15 @@ const CategoriesPage = () => {
       </div>
 
       {/* Create Category Dialog */}
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+      <Dialog open={createDialogOpen} onOpenChange={(open) => {
+        setCreateDialogOpen(open);
+        if (!open) {
+          setNewCategoryName("");
+          setNewSlug("");
+          setNewParentId(null);
+          setNewImages([]);
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Category</DialogTitle>
@@ -387,38 +542,113 @@ const CategoriesPage = () => {
                 value={newSlug}
                 onChange={(e) => setNewSlug(e.target.value)}
               />
-              <p className="text-sm text-muted-foreground">
-                URL-friendly identifier (auto-generated from name)
-              </p>
+        
             </div>
             <div className="space-y-2">
               <Label htmlFor="parentCategory">Parent Category (Optional)</Label>
               <select
                 id="parentCategory"
-                className="w-full px-3 py-2 border rounded-md bg-background"
-                value={newParentId || ""}
+                className="w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder:text-sm"
+                value={newParentId || "Select parent"}
                 onChange={(e) =>
                   setNewParentId(e.target.value ? Number(e.target.value) : null)
                 }
               >
-                <option value="">None (Top-level category)</option>
+                <option value="" className="text-sm">None (Top-level category)</option>
                 {categories
                   .filter((cat) => cat.parentId === null)
                   .map((cat) => (
-                    <option key={cat.id} value={cat.id}>
+                    <option key={cat.id} value={cat.id} className="text-sm placeholder:text-sm">
                       {cat.name}
                     </option>
                   ))}
               </select>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Select a parent category to create a subcategory
               </p>
+            </div>
+
+            {/* Images */}
+            <div className="space-y-2">
+              <Label>Category Images</Label>
+              <div className="bg-muted/50 rounded-lg border p-4 space-y-4">
+                <div className="flex items-center justify-end">
+                  <input
+                    id="image-upload"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
+                  <Label
+                    htmlFor="image-upload"
+                    className="cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md inline-flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Images
+                  </Label>
+                </div>
+
+                {newImages.length === 0 && (
+                  <p className="text-muted-foreground text-sm">
+                    No images added yet. Click &quot;Add Images&quot; to upload.
+                  </p>
+                )}
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  {newImages.map((image, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="relative group"
+                    >
+                      <div className="aspect-square bg-muted rounded-lg overflow-hidden border">
+                        <img
+                          src={image.url}
+                          alt={image.altText || `Category image ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="mt-2 space-y-2">
+                        <Input
+                          placeholder="Alt text (optional)"
+                          value={image.altText}
+                          onChange={(e) => {
+                            const newImagesCopy = [...newImages];
+                            newImagesCopy[index].altText = e.target.value;
+                            setNewImages(newImagesCopy);
+                          }}
+                          className="text-xs"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeImage(index)}
+                          className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Remove
+                        </Button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setCreateDialogOpen(false)}
+              onClick={() => {
+                setCreateDialogOpen(false);
+                setNewCategoryName("");
+                setNewSlug("");
+                setNewParentId(null);
+                setNewImages([]);
+              }}
             >
               Cancel
             </Button>
@@ -427,6 +657,152 @@ const CategoriesPage = () => {
               onClick={handleCreateCategory}
             >
               Create Category
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Category Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={(open) => {
+        setEditDialogOpen(open);
+        if (!open) {
+          setCategoryToEdit(null);
+          setEditCategoryName("");
+          setEditImages([]);
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-gray-600">Edit Category</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 max-h-[70dvh] overflow-auto">
+            {/* Category Name - Editable */}
+            <div className="space-y-2">
+              <Label htmlFor="editCategoryName">Category Name</Label>
+              <Input
+                id="editCategoryName"
+                placeholder="Enter category name"
+                value={editCategoryName}
+                onChange={(e) => setEditCategoryName(e.target.value)}
+              />
+            </div>
+
+            {/* Slug - Disabled */}
+            <div className="space-y-2">
+              <Label htmlFor="editCategorySlug">Slug</Label>
+              <Input
+                id="editCategorySlug"
+                placeholder="category-slug"
+                value={categoryToEdit?.slug || ""}
+                disabled
+                className="bg-muted"
+              />
+              <p className="text-sm text-muted-foreground">
+                URL-friendly identifier (cannot be changed)
+              </p>
+            </div>
+
+            {/* Parent Category - Disabled */}
+            <div className="space-y-2">
+              <Label>Parent Category</Label>
+              <Input
+                value={categoryToEdit?.parent?.name || "None (Top-level category)"}
+                disabled
+                className="bg-muted"
+              />
+              <p className="text-sm text-muted-foreground">
+                Parent category cannot be changed
+              </p>
+            </div>
+
+            {/* Images - Editable */}
+            <div className="space-y-2">
+              <Label>Category Images</Label>
+              <div className="bg-muted/50 rounded-lg border p-4 space-y-4">
+                <div className="flex items-center justify-end">
+                  <input
+                    id="edit-image-upload"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleEditImageUpload}
+                  />
+                  <Label
+                    htmlFor="edit-image-upload"
+                    className="cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md inline-flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Images
+                  </Label>
+                </div>
+
+                {editImages.length === 0 && (
+                  <p className="text-muted-foreground text-sm">
+                    No images added yet. Click &quot;Add Images&quot; to upload.
+                  </p>
+                )}
+
+                <div className={`grid gap-4 ${editImages.length > 2 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+                  {editImages.map((image, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="relative group"
+                    >
+                      <div className="aspect-square bg-muted rounded-lg overflow-hidden border">
+                        <img
+                          src={image.url}
+                          alt={image.altText || `Category image ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="mt-2 space-y-2">
+                        <Input
+                          placeholder="Alt text (optional)"
+                          value={image.altText}
+                          onChange={(e) => {
+                            const newImagesCopy = [...editImages];
+                            newImagesCopy[index].altText = e.target.value;
+                            setEditImages(newImagesCopy);
+                          }}
+                          className="text-xs"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeEditImage(index)}
+                          className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Remove
+                        </Button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditDialogOpen(false);
+                setCategoryToEdit(null);
+                setEditCategoryName("");
+                setEditImages([]);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-accent hover:bg-accent/90 text-accent-foreground"
+              onClick={handleUpdateCategory}
+            >
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>

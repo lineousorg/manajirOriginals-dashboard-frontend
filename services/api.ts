@@ -6,6 +6,7 @@ import {
 } from "@/types/product";
 import {
   Category,
+  CategoryImage,
   CreateCategoryInput,
   UpdateCategoryInput,
 } from "@/types/category";
