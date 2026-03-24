@@ -11,6 +11,8 @@ import {
   Calendar,
   Loader2,
   Download,
+  MapPin,
+  Phone,
 } from "lucide-react";
 import { useOrders } from "@/hooks/useOrders";
 import { Order, OrderStatus, OrderItem } from "@/types/order";
@@ -61,7 +63,7 @@ const OrderStatusBadge = ({ status }: { status: OrderStatus }) => {
     <span
       className={cn(
         "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
-        orderStatusStyles[status]
+        orderStatusStyles[status],
       )}
     >
       {orderStatusLabels[status]}
@@ -117,7 +119,7 @@ const OrderDetailsModal = ({
   const formatCurrency = (amount: string) => {
     return parseFloat(amount).toLocaleString("en-US", {
       style: "currency",
-      currency: "USD",
+      currency: "BDT",
     });
   };
 
@@ -136,7 +138,7 @@ const OrderDetailsModal = ({
       ) : error ? (
         <div className="text-center py-8 text-destructive">{error}</div>
       ) : order ? (
-        <div className="space-y-6">
+        <div className="space-y-6 h-125 overflow-auto">
           {/* Order Info Grid */}
           <div className="grid grid-cols-2 gap-4">
             {/* Customer */}
@@ -145,11 +147,37 @@ const OrderDetailsModal = ({
                 <User className="w-4 h-4" />
                 <span className="text-sm font-medium">Customer</span>
               </div>
+              {order.address && (
+                <>
+                  <p className="font-medium">
+                    {order.address.firstName} {order.address.lastName}
+                  </p>
+                  <div className="flex items-center gap-1.5 font-medium">
+                    {/* <Phone className="w-3.5 h-3.5" /> */}
+                    <span>{order.address.phone}</span>
+                  </div>
+                </>
+              )}
               <p className="font-medium">{order.user.email}</p>
-              {/* <p className="text-sm text-muted-foreground">
-                ID: {order.userId}
-              </p> */}
             </div>
+
+            {/* Address & Phone */}
+            {order.address && (
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                  <MapPin className="w-4 h-4" />
+                  <span className="text-sm font-medium">Shipping Address</span>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">
+                    {order.address.address}, {order.address.city}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {order.address.postalCode}, {order.address.country}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Status */}
             <div className="p-4 rounded-lg bg-muted/50">
@@ -208,9 +236,6 @@ const OrderDetailsModal = ({
                               <p className="font-medium">
                                 {item.variant.product.name}
                               </p>
-                              <p className="text-sm text-muted-foreground">
-                                Variant ID: {item.variantId}
-                              </p>
                             </div>
                           </div>
                         </TableCell>
@@ -227,7 +252,7 @@ const OrderDetailsModal = ({
                         </TableCell>
                         <TableCell className="text-right font-medium">
                           {formatCurrency(
-                            (parseFloat(item.price) * item.quantity).toString()
+                            (parseFloat(item.price) * item.quantity).toString(),
                           )}
                         </TableCell>
                       </TableRow>
@@ -274,7 +299,7 @@ const OrdersPage = () => {
 
   // Download receipt state
   const [downloadingReceipt, setDownloadingReceipt] = useState<number | null>(
-    null
+    null,
   );
 
   const filteredOrders = useMemo(() => {
@@ -311,7 +336,7 @@ const OrdersPage = () => {
 
   const handleStatusChange = async (
     orderId: number,
-    newStatus: OrderStatus
+    newStatus: OrderStatus,
   ) => {
     try {
       await updateOrderStatus(orderId, { status: newStatus });
@@ -367,18 +392,21 @@ const OrdersPage = () => {
   const formatCurrency = (amount: string) => {
     return parseFloat(amount).toLocaleString("en-US", {
       style: "currency",
-      currency: "USD",
+      currency: "BDT",
     });
   };
 
   type ColorVariant = "amber" | "blue" | "violet" | "emerald" | "rose";
 
-  const colorVariants: Record<ColorVariant, {
-    bg: string;
-    text: string;
-    textStrong: string;
-    accent: string;
-  }> = {
+  const colorVariants: Record<
+    ColorVariant,
+    {
+      bg: string;
+      text: string;
+      textStrong: string;
+      accent: string;
+    }
+  > = {
     amber: {
       bg: "bg-amber-50",
       text: "text-amber-400",
@@ -422,33 +450,48 @@ const OrdersPage = () => {
         </FadeIn>
         {/* Quick stats - Minimal Elegant Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {([
-            {
-              status: "PENDING",
-              label: "Pending",
-              icon: Clock,
-              color: "amber" as ColorVariant,
-            },
-            { status: "PAID", label: "Paid", icon: CreditCard, color: "blue" as ColorVariant },
-            {
-              status: "SHIPPED",
-              label: "Shipped",
-              icon: Truck,
-              color: "violet" as ColorVariant,
-            },
-            {
-              status: "DELIVERED",
-              label: "Delivered",
-              icon: PackageCheck,
-              color: "emerald" as ColorVariant,
-            },
-            {
-              status: "CANCELLED",
-              label: "Cancelled",
-              icon: Ban,
-              color: "rose" as ColorVariant,
-            },
-          ] as { status: string; label: string; icon: React.ComponentType<{ size?: number; strokeWidth?: number }>; color: ColorVariant }[]).map(({ status, label, icon: Icon, color }) => {
+          {(
+            [
+              {
+                status: "PENDING",
+                label: "Pending",
+                icon: Clock,
+                color: "amber" as ColorVariant,
+              },
+              {
+                status: "PAID",
+                label: "Paid",
+                icon: CreditCard,
+                color: "blue" as ColorVariant,
+              },
+              {
+                status: "SHIPPED",
+                label: "Shipped",
+                icon: Truck,
+                color: "violet" as ColorVariant,
+              },
+              {
+                status: "DELIVERED",
+                label: "Delivered",
+                icon: PackageCheck,
+                color: "emerald" as ColorVariant,
+              },
+              {
+                status: "CANCELLED",
+                label: "Cancelled",
+                icon: Ban,
+                color: "rose" as ColorVariant,
+              },
+            ] as {
+              status: string;
+              label: string;
+              icon: React.ComponentType<{
+                size?: number;
+                strokeWidth?: number;
+              }>;
+              color: ColorVariant;
+            }[]
+          ).map(({ status, label, icon: Icon, color }) => {
             const colors = colorVariants[color] || colorVariants.amber;
             return (
               <Card
@@ -465,8 +508,12 @@ const OrdersPage = () => {
                     </div>
 
                     <div className="mt-4 text-right">
-                      <p className={`text-2xl font-semibold ${colors.textStrong}`}>
-                        {(orderStats[status as OrderStatus] ?? 0).toLocaleString()}
+                      <p
+                        className={`text-2xl font-semibold ${colors.textStrong}`}
+                      >
+                        {(
+                          orderStats[status as OrderStatus] ?? 0
+                        ).toLocaleString()}
                       </p>
                       <p className="text-sm text-slate-500 mt-0.5">{label}</p>
                     </div>
@@ -481,8 +528,6 @@ const OrdersPage = () => {
             );
           })}
         </div>
-
-
 
         {/* Filters */}
         <FadeIn delay={0.1} className="flex flex-col sm:flex-row gap-4">

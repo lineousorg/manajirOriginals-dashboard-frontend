@@ -56,31 +56,43 @@ import { TableSkeleton } from "@/components/ui/skeleton-card";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { Switch } from "@/components/ui/switch";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 const ProductsPage = () => {
-  const { products, isLoading, deleteProduct, toggleProductActive } =
-    useProducts();
+  const {
+    products,
+    isLoading,
+    deleteProduct,
+    toggleProductActive,
+    pagination,
+    goToPage,
+    goToNextPage,
+    goToPreviousPage,
+    filterByCategory,
+  } = useProducts();
   const { categories } = useCategories();
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<number | "all">("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [togglingId, setTogglingId] = useState<number | null>(null);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const { toast } = useToast();
 
+  // Note: Server-side pagination is now used, so we display products directly from API
+  // Search and category filtering would need to be handled server-side for full pagination support
   const filteredProducts = useMemo(() => {
     if (!Array.isArray(products)) return [];
-    return products.filter((product) => {
-      const matchesSearch = product.name
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
-      const matchesCategory =
-        categoryFilter === "all" || product.categoryId === categoryFilter;
-
-      return matchesSearch && matchesCategory;
-    });
-  }, [products, searchQuery, categoryFilter]);
+    return products;
+  }, [products]);
 
   const handleDeleteClick = (product: Product) => {
     setProductToDelete(product);
@@ -161,18 +173,20 @@ const ProductsPage = () => {
             />
           </div>
           <Select
-            value={String(categoryFilter)}
-            onValueChange={(value) =>
-              setCategoryFilter(value === "all" ? "all" : Number(value))
-            }
+            value={categoryFilter}
+            onValueChange={(value) => {
+              setCategoryFilter(value);
+              filterByCategory(value === "all" ? null : value);
+            }}
           >
-            <SelectTrigger className="w-45">
+            <SelectTrigger className="w-45 bg-white">
               <Filter className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Category" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white">
+              <SelectItem value="all">All Categories</SelectItem>
               {categories.map((cat) => (
-                <SelectItem key={cat.id} value={String(cat.id)}>
+                <SelectItem key={cat.id} value={cat.slug}>
                   {cat.name}
                 </SelectItem>
               ))}
@@ -313,7 +327,9 @@ const ProductsPage = () => {
                                               : "bg-gray-100 text-gray-700"
                                           }`}
                                         >
-                                          {variant.isActive ? "Active" : "Inactive"}
+                                          {variant.isActive
+                                            ? "Active"
+                                            : "Inactive"}
                                         </span>
                                         <span className="font-medium truncate">
                                           {variant.sku}
@@ -372,6 +388,58 @@ const ProductsPage = () => {
                   </AnimatePresence>
                 </TableBody>
               </Table>
+
+              {/* Pagination */}
+              {pagination.totalPages > 0 && (
+                <div className="flex items-center justify-between px-4 py-4 border-t bg-muted/20">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+                    {Math.min(
+                      pagination.page * pagination.limit,
+                      pagination.total,
+                    )}{" "}
+                    of {pagination.total} products
+                  </div>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={goToPreviousPage}
+                          className={
+                            !pagination.hasPrevious
+                              ? "pointer-events-none opacity-50"
+                              : "cursor-pointer"
+                          }
+                        />
+                      </PaginationItem>
+                      {Array.from(
+                        { length: pagination.totalPages },
+                        (_, i) => i + 1,
+                      ).map((page) => (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            onClick={() => goToPage(page)}
+                            isActive={pagination.page === page}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={goToNextPage}
+                          className={
+                            !pagination.hasNext
+                              ? "pointer-events-none opacity-50"
+                              : "cursor-pointer"
+                          }
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
             </div>
           )}
         </FadeIn>
