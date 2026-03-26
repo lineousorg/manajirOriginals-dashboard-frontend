@@ -339,6 +339,7 @@ const AttributesPage = () => {
                       </div>
                     ))
                   )}
+                  
                 </TableBody>
               </Table>
             </div>
