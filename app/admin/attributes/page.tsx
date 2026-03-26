@@ -254,8 +254,8 @@ const AttributesPage = () => {
                     </TableRow>
                   ) : (
                     filteredAttributes.map((attribute) => (
-                      <>
-                        <TableRow key={attribute.id}>
+                      <div key={attribute.id}>
+                        <TableRow>
                           <TableCell>
                             <Button
                               variant="ghost"
@@ -336,7 +336,7 @@ const AttributesPage = () => {
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </div>
                     ))
                   )}
                 </TableBody>
