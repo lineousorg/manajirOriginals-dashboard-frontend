@@ -58,5 +58,18 @@ jobs:
             whoami
             hostname
             cd /var/www/manajirOriginals-dashboard-frontend
+
+            # Pull latest Docker image
             docker pull lineousreza/lineousrepo:${{ env.TAG }}
+
+            # Check if container is running
+            CONTAINER_NAME=$(docker compose -f ${{ env.COMPOSE_FILE }} ps -q)
+            if [ -n "$CONTAINER_NAME" ]; then
+              echo "Stopping and removing existing container..."
+              docker compose -f ${{ env.COMPOSE_FILE }} down
+            else
+              echo "No existing container running."
+            fi
+
+            # Start new container
             docker compose -f ${{ env.COMPOSE_FILE }} up -d
