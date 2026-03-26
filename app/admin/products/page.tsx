@@ -198,7 +198,7 @@ const ProductsPage = () => {
         <FadeIn delay={0.2}>
           {isLoading ? (
             <TableSkeleton rows={5} />
-          ) : filteredProducts.length === 0 ? (
+          ) : filteredProducts?.length === 0 ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -249,7 +249,7 @@ const ProductsPage = () => {
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
-                              {product.images && product.images.length > 0 ? (
+                              {product.images && product.images?.length > 0 ? (
                                 <img
                                   src={product.images[0].url}
                                   alt={

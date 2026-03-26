@@ -104,7 +104,7 @@ export default function DashboardPage() {
         <FadeIn>
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">
-            Welcome back! Heres an overview of your store.
+            Welcome back! Heres an overview of your storeee.
           </p>
         </FadeIn>
 
