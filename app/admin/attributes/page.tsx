@@ -340,7 +340,7 @@ const AttributesPage = () => {
                     ))
                   )}
 
-                  
+
                 </TableBody>
               </Table>
             </div>
@@ -375,7 +375,7 @@ const AttributesPage = () => {
               <Button onClick={handleCreateAttribute}>Create</Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
+        </Dialog> 
 
         {/* Edit Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
