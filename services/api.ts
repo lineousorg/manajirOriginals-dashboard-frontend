@@ -20,6 +20,11 @@ import {
   CreateAttributeValueInput,
   UpdateAttributeValueInput,
 } from "@/types/attribute";
+import {
+  Discount,
+  CreateDiscountInput,
+  UpdateDiscountInput,
+} from "@/types/discount";
 
 // const API_BASE_URL = "http://localhost:5000/api"; // your backend
 // const API_BASE_URL = "https://manajiroriginals.com/api";
@@ -258,6 +263,50 @@ export const attributeValuesApi = {
 
   delete: async (id: number): Promise<void> => {
     await api.delete(`/attribute-values/${id}`);
+  },
+};
+
+// Discounts API
+export const discountsApi = {
+  // Get all discounts (admin)
+  getAll: async (): Promise<Discount[]> => {
+    const response = await api.get("/discounts");
+    return response.data.data;
+  },
+
+  // Get active discounts (public)
+  getActive: async (): Promise<Discount[]> => {
+    const response = await api.get("/discounts/active");
+    return response.data.data;
+  },
+
+  // Get single discount by ID
+  getById: async (id: number): Promise<Discount> => {
+    const response = await api.get(`/discounts/${id}`);
+    return response.data.data;
+  },
+
+  // Create new discount
+  create: async (data: CreateDiscountInput): Promise<Discount> => {
+    const response = await api.post("/discounts", data);
+    return response.data.data;
+  },
+
+  // Update discount
+  update: async (id: number, data: UpdateDiscountInput): Promise<Discount> => {
+    const response = await api.patch(`/discounts/${id}`, data);
+    return response.data.data;
+  },
+
+  // Delete discount
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/discounts/${id}`);
+  },
+
+  // Toggle discount active status
+  toggleActive: async (id: number): Promise<Discount> => {
+    const response = await api.patch(`/discounts/${id}/toggle-active`);
+    return response.data.data;
   },
 };
 

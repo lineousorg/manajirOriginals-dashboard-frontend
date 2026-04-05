@@ -8,8 +8,20 @@ export interface ProductCategory {
   updatedAt: string;
 }
 
-// Product variant attribute interface
-export interface VariantAttribute {
+// Product variant attribute interface (API response format)
+export interface VariantAttributeResponse {
+  attributeValue: {
+    id: number;
+    value: string;
+    attribute: {
+      id: number;
+      name: string;
+    };
+  };
+}
+
+// Form-friendly variant attribute
+export interface VariantAttributeForm {
   attributeId: number;
   valueId: number;
 }
@@ -21,7 +33,7 @@ export interface ProductVariant {
   price: number;
   stock: number;
   productId: number;
-  attributes: VariantAttribute[];
+  attributes: VariantAttributeResponse[];
   isActive: boolean;
   isDeleted: boolean;
   deletedAt: string | null;
@@ -67,7 +79,7 @@ export interface CreateVariantInput {
   sku: string;
   price: number;
   stock: number;
-  attributes?: VariantAttribute[];
+  attributes?: VariantAttributeForm[];
   isActive?: boolean;
 }
 

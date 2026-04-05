@@ -117,7 +117,7 @@ const OrderDetailsModal = ({
   const formatCurrency = (amount: string) => {
     return parseFloat(amount).toLocaleString("en-US", {
       style: "currency",
-      currency: "USD",
+      currency: "BDT",
     });
   };
 
@@ -367,7 +367,7 @@ const OrdersPage = () => {
   const formatCurrency = (amount: string) => {
     return parseFloat(amount).toLocaleString("en-US", {
       style: "currency",
-      currency: "USD",
+      currency: "BDT",
     });
   };
 

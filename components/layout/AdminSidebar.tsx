@@ -13,6 +13,7 @@ import {
   FolderTree,
   ShoppingCart,
   Tag,
+  Percent,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ const navItems = [
   { icon: Package, label: "Products", path: "/admin/products" },
   { icon: FolderTree, label: "Categories", path: "/admin/categories" },
   { icon: Tag, label: "Attributes", path: "/admin/attributes" },
+  // { icon: Percent, label: "Discounts", path: "/admin/discounts" },
   { icon: ShoppingCart, label: "Orders", path: "/admin/orders" },
   { icon: Users, label: "Users", path: "/admin/users" },
   // { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },

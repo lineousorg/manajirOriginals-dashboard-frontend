@@ -80,15 +80,13 @@ export default function LoginPage() {
             <ShoppingBag className="w-5 h-5 text-accent-foreground" />
           </div>
           <span className="font-semibold text-xl text-primary-foreground">
-            Commerce Admin
+           Manajir Originals
           </span>
         </div>
 
         <div className="space-y-6">
           <h1 className="text-4xl font-bold text-primary-foreground leading-tight">
             Manage your store
-            <br />
-            with confidence
           </h1>
           <p className="text-primary-foreground/70 text-lg max-w-md">
             A powerful admin dashboard to manage products, orders, and customers
@@ -97,7 +95,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-primary-foreground/50 text-sm">
-          © 2024 Commerce Admin. All rights reserved.
+          © 2026 Manajir Originals. All rights reserved.
         </p>
       </motion.div>
 
