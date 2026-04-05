@@ -82,10 +82,28 @@ export const authApi = {
 };
 
 // Products API
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  message: string;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrevious: boolean;
+  };
+}
+
 export const productsApi = {
-  getAll: async (): Promise<Product[]> => {
-    const response = await api.get("/products");
-    return response.data.data;
+  getAll: async (params?: PaginationParams): Promise<PaginatedResponse<Product>> => {
+    const response = await api.get("/products", { params });
+    return response.data;
   },
   getById: async (id: number): Promise<Product> => {
     const response = await api.get(`/products/${id}`);
@@ -131,6 +149,20 @@ export const productsApi = {
   ): Promise<void> => {
     await api.delete(`/products/${productId}/variants/${variantId}`);
   },
+  // Get products by category slug with pagination and filters
+  getByCategorySlug: async (
+    slug: string,
+    params?: PaginationParams & {
+      minPrice?: number;
+      maxPrice?: number;
+      sizes?: string[];
+      colors?: string[];
+      sort?: "newest" | "price-asc" | "price-desc" | "name-asc" | "name-desc";
+    }
+  ): Promise<PaginatedResponse<Product>> => {
+    const response = await api.get(`/products/category/${slug}`, { params });
+    return response.data;
+  },
 };
 
 // Categories API
@@ -167,9 +199,9 @@ export const categoriesApi = {
 
 // Orders API
 export const ordersApi = {
-  getAll: async (): Promise<Order[]> => {
-    const response = await api.get("/orders");
-    return response.data.data;
+  getAll: async (params?: PaginationParams): Promise<PaginatedResponse<Order>> => {
+    const response = await api.get("/orders", { params });
+    return response.data;
   },
 
   getById: async (id: number): Promise<Order> => {

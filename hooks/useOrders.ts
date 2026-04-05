@@ -1,21 +1,45 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Order, OrderStatus, UpdateOrderStatusInput } from "@/types/order";
-import { ordersApi } from "@/services/api";
+import { Order, UpdateOrderStatusInput } from "@/types/order";
+import { ordersApi, PaginationParams, PaginatedResponse } from "@/services/api";
+
+export interface PaginationState {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
 
 export const useOrders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<PaginationState>({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrevious: false,
+  });
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (params?: PaginationParams) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await ordersApi.getAll();
-      console.log(data);
-      setOrders(data);
+      const response: PaginatedResponse<Order> = await ordersApi.getAll(params);
+      setOrders(response.data);
+      setPagination({
+        page: response.pagination.page,
+        limit: response.pagination.limit,
+        total: response.pagination.total,
+        totalPages: response.pagination.totalPages,
+        hasNext: response.pagination.hasNext,
+        hasPrevious: response.pagination.hasPrevious,
+      });
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to fetch orders");
     } finally {
@@ -78,6 +102,7 @@ export const useOrders = () => {
 
   return {
     orders,
+    pagination,
     isLoading,
     error,
     refetch: fetchOrders,

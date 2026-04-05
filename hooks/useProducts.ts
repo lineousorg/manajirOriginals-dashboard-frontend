@@ -6,20 +6,78 @@ import {
   CreateProductInput,
   UpdateProductInput,
 } from "@/types/product";
-import { productsApi } from "@/services/api";
+import { productsApi, PaginationParams, PaginatedResponse } from "@/services/api";
+
+export interface PaginationState {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
+
+export interface CategoryProductsParams extends PaginationParams {
+  minPrice?: number;
+  maxPrice?: number;
+  sizes?: string[];
+  colors?: string[];
+  sort?: "newest" | "price-asc" | "price-desc" | "name-asc" | "name-desc";
+}
 
 export const useProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<PaginationState>({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrevious: false,
+  });
+  const [currentCategorySlug, setCurrentCategorySlug] = useState<string | null>(null);
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (params?: PaginationParams) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await productsApi.getAll();
-      console.log(data);
-      setProducts(data);
+      const response: PaginatedResponse<Product> = await productsApi.getAll(params);
+      console.log(response);
+      setProducts(response.data);
+      setPagination({
+        page: response.pagination.page,
+        limit: response.pagination.limit,
+        total: response.pagination.total,
+        totalPages: response.pagination.totalPages,
+        hasNext: response.pagination.hasNext,
+        hasPrevious: response.pagination.hasPrevious,
+      });
+      setCurrentCategorySlug(null);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Failed to fetch products");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const fetchProductsByCategory = useCallback(async (slug: string, params?: CategoryProductsParams) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response: PaginatedResponse<Product> = await productsApi.getByCategorySlug(slug, params);
+      console.log(response);
+      setProducts(response.data);
+      setPagination({
+        page: response.pagination.page,
+        limit: response.pagination.limit,
+        total: response.pagination.total,
+        totalPages: response.pagination.totalPages,
+        hasNext: response.pagination.hasNext,
+        hasPrevious: response.pagination.hasPrevious,
+      });
+      setCurrentCategorySlug(slug);
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to fetch products");
     } finally {
@@ -30,6 +88,42 @@ export const useProducts = () => {
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
+
+  const goToPage = useCallback((page: number) => {
+    if (currentCategorySlug) {
+      fetchProductsByCategory(currentCategorySlug, { page, limit: pagination.limit });
+    } else {
+      fetchProducts({ page, limit: pagination.limit });
+    }
+  }, [currentCategorySlug, fetchProducts, fetchProductsByCategory, pagination.limit]);
+
+  const goToNextPage = useCallback(() => {
+    if (pagination.hasNext) {
+      goToPage(pagination.page + 1);
+    }
+  }, [pagination.hasNext, pagination.page, goToPage]);
+
+  const goToPreviousPage = useCallback(() => {
+    if (pagination.hasPrevious) {
+      goToPage(pagination.page - 1);
+    }
+  }, [pagination.hasPrevious, pagination.page, goToPage]);
+
+  const setPageSize = useCallback((limit: number) => {
+    if (currentCategorySlug) {
+      fetchProductsByCategory(currentCategorySlug, { page: 1, limit });
+    } else {
+      fetchProducts({ page: 1, limit });
+    }
+  }, [currentCategorySlug, fetchProducts, fetchProductsByCategory]);
+
+  const filterByCategory = useCallback((slug: string | null) => {
+    if (slug) {
+      fetchProductsByCategory(slug, { page: 1, limit: pagination.limit });
+    } else {
+      fetchProducts({ page: 1, limit: pagination.limit });
+    }
+  }, [fetchProducts, fetchProductsByCategory, pagination.limit]);
 
   const createProduct = async (data: CreateProductInput): Promise<Product> => {
     setError(null);
@@ -148,7 +242,13 @@ export const useProducts = () => {
     products,
     isLoading,
     error,
+    pagination,
     refetch: fetchProducts,
+    goToPage,
+    goToNextPage,
+    goToPreviousPage,
+    setPageSize,
+    filterByCategory,
     createProduct,
     updateProduct,
     patchProduct,

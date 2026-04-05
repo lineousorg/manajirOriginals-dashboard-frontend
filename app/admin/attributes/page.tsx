@@ -254,8 +254,8 @@ const AttributesPage = () => {
                     </TableRow>
                   ) : (
                     filteredAttributes.map((attribute) => (
-                      <>
-                        <TableRow key={attribute.id}>
+                      <div key={attribute.id}>
+                        <TableRow>
                           <TableCell>
                             <Button
                               variant="ghost"
@@ -336,9 +336,11 @@ const AttributesPage = () => {
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </div>
                     ))
                   )}
+
+
                 </TableBody>
               </Table>
             </div>
@@ -373,7 +375,7 @@ const AttributesPage = () => {
               <Button onClick={handleCreateAttribute}>Create</Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
+        </Dialog> 
 
         {/* Edit Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>

@@ -13,6 +13,19 @@ export interface OrderUser {
   email: string;
 }
 
+// Address interface (nested in Order)
+export interface OrderAddress {
+  id: number;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  address: string;
+  city: string;
+  postalCode: string;
+  country: string;
+  isDefault: boolean;
+}
+
 // Product interface (nested in OrderItem)
 export interface OrderProduct {
   id: number;
@@ -42,6 +55,15 @@ export interface OrderItem {
   variant: OrderVariant;
 }
 
+export interface OrderPagination {
+  hasNext: boolean;
+  hasPrevious: boolean;
+  limit: number;
+  page: number;
+  total: number;
+  totalPages: number;
+}
+
 // Order interface (matches API response)
 export interface Order {
   id: number;
@@ -53,6 +75,9 @@ export interface Order {
   updatedAt: string;
   user: OrderUser;
   items?: OrderItem[];
+  addressId?: number;
+  address?: OrderAddress;
+  pagination?: OrderPagination;
 }
 
 // Input types for updating order status
