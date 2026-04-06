@@ -12,6 +12,7 @@ import {
   ChevronUp,
   CornerDownRight,
   Pencil,
+  Power,
 } from "lucide-react";
 import { useCategories } from "@/hooks/useCategories";
 import { PageTransition, FadeIn } from "@/components/ui/motion";
@@ -51,6 +52,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { TableSkeleton } from "@/components/ui/skeleton-card";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 import { CreateCategoryInput, CategoryImage, Category } from "@/types/category";
 
 const CategoriesPage = () => {
@@ -60,6 +62,7 @@ const CategoriesPage = () => {
     createCategory,
     updateCategory,
     deleteCategory,
+    toggleCategoryStatus,
   } = useCategories();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -298,6 +301,25 @@ const CategoriesPage = () => {
     setCategoryToDelete(null);
   };
 
+  const handleToggleStatusClick = async (id: number) => {
+    try {
+      const category = categories.find((c) => c.id === id);
+      const updated = await toggleCategoryStatus(id);
+      toast({
+        title: "Category status updated",
+        description: `${category?.name} is now ${updated.isActive ? "active" : "inactive"}.`,
+      });
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      const backendMessage = err?.response?.data?.message;
+      toast({
+        title: "Error",
+        description: backendMessage || "Failed to toggle category status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getCategoryToDelete = () => {
     if (!categoryToDelete) return null;
     return categories.find((c) => c.id === categoryToDelete);
@@ -380,6 +402,17 @@ const CategoriesPage = () => {
             <span className="text-sm text-muted-foreground">{category.slug}</span>
           </TableCell>
           <TableCell>
+            {category.isActive ? (
+              <Badge variant="default" className="bg-green-500 hover:bg-green-600">
+                Active
+              </Badge>
+            ) : (
+              <Badge variant="secondary">
+                Inactive
+              </Badge>
+            )}
+          </TableCell>
+          <TableCell>
             <div className="flex items-center gap-2">
               <Package className="w-4 h-4 text-muted-foreground" />
               <span className="font-medium">{productCount}</span>
@@ -392,12 +425,18 @@ const CategoriesPage = () => {
                   <MoreHorizontal className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="bg-white">
                 <DropdownMenuItem
                   onClick={() => handleEditClick(category)}
                 >
                   <Pencil className="w-4 h-4 mr-2" />
                   Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleToggleStatusClick(category.id)}
+                >
+                  <Power className="w-4 h-4 mr-2" />
+                  {category.isActive ? "Deactivate" : "Activate"}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => handleDeleteClick(category.id)}
@@ -486,6 +525,7 @@ const CategoriesPage = () => {
                   <TableRow className="bg-muted/50">
                     <TableHead>Category Name</TableHead>
                     <TableHead>Slug</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Products</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>

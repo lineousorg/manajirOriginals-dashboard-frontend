@@ -8,6 +8,7 @@ export interface Category {
   id: number;
   name: string;
   slug: string;
+  isActive: boolean;
   parentId: number | null;
   images: CategoryImage[];
   createdAt: string;

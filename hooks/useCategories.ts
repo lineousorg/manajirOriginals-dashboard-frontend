@@ -63,6 +63,20 @@ export const useCategories = () => {
     }
   };
 
+  const toggleCategoryStatus = async (id: number): Promise<Category> => {
+    setError(null);
+    try {
+      const updated = await categoriesApi.toggleStatus(id);
+      setCategories((prev) =>
+        prev.map((c) => (c.id === id ? updated : c))
+      );
+      return updated;
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Failed to toggle category status");
+      throw err;
+    }
+  };
+
   return {
     categories,
     isLoading,
@@ -71,5 +85,6 @@ export const useCategories = () => {
     createCategory,
     updateCategory,
     deleteCategory,
+    toggleCategoryStatus,
   };
 };

@@ -195,6 +195,12 @@ export const categoriesApi = {
   delete: async (id: number): Promise<void> => {
     await api.delete(`/categories/${id}`);
   },
+
+  // Toggle category status (active/inactive)
+  toggleStatus: async (id: number): Promise<Category> => {
+    const response = await api.patch(`/categories/${id}/toggle-status`);
+    return response.data.data;
+  },
 };
 
 // Orders API
