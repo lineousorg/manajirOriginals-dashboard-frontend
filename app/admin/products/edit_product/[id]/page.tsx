@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Trash2, ArrowLeft, Loader2 } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Loader2, ChevronUp, ChevronDown } from "lucide-react";
 import { PageTransition, FadeIn } from "@/components/ui/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ import { useAttributes } from "@/hooks/useAttributes";
 import { useAttributeValues } from "@/hooks/useAttributeValues";
 import { productsApi } from "@/services/api";
 import { VariantAttributeResponse } from "@/types/product";
+import { Badge } from "@/components/ui/badge";
 
 // Schema for form validation
 const productSchema = z.object({
@@ -62,7 +63,7 @@ const transformVariantAttributes = (
   variant: { attributes?: VariantAttributeResponse[] }
 ): { attributeId: number; valueId: number }[] => {
   if (!variant.attributes || !Array.isArray(variant.attributes)) return [];
-  
+
   return variant.attributes.map((attr) => ({
     attributeId: attr.attributeValue?.attribute?.id ?? 0,
     valueId: attr.attributeValue?.id ?? 0,
@@ -73,15 +74,16 @@ export default function EditProductPage() {
   const params = useParams<{ id: string }>();
   const id = Number(params?.id);
   const router = useRouter();
-  
+
   const { product, isLoading: isLoadingProduct, error, setProduct } = useProduct(id);
   const { categories, isLoading: isLoadingCategories } = useCategories();
   const { attributes } = useAttributes();
   const { attributeValues } = useAttributeValues();
   const { toast } = useToast();
-  
+
   const [togglingVariantId, setTogglingVariantId] = useState<number | null>(null);
   const [dataReady, setDataReady] = useState(false);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
 
   const {
     register,
@@ -310,118 +312,179 @@ export default function EditProductPage() {
                 {(watchedValues.variants || []).map((variant, index) => {
                   const backendVariant = product.variants[index];
                   return (
-                    <div key={index} className="grid gap-4 md:grid-cols-12 p-4 bg-muted/50 rounded-lg">
-                      {/* Status */}
-                      <div className="space-y-2 md:col-span-2">
-                        <Label>Status</Label>
-                        <div className="flex items-center gap-2 h-10">
+                    <div key={index} className="bg-white rounded-lg border shadow-sm overflow-hidden">
+                      {/* Header - Always visible, click to expand/collapse */}
+                      <div
+
+                        onClick={() => setExpandedIndex(expandedIndex === index ? null : index)}
+                        className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-4">
+                          {/* Status Badge */}
                           {backendVariant?.id ? (
-                            <>
+                            <Badge variant={backendVariant.isActive ? "default" : "secondary"} className="h-6">
+                              {backendVariant.isActive ? "Active" : "Inactive"}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="h-6">New</Badge>
+                          )}
+
+                          {/* Quick Info */}
+                          <div className="flex items-center gap-3 text-sm">
+                            <span className="font-mono text-muted-foreground">
+                              {watch(`variants.${index}.sku`) || "No SKU"}
+                            </span>
+                            <span className="text-muted-foreground">•</span>
+                            <span className="font-semibold">
+                              ৳{watch(`variants.${index}.price`) || 0}
+                            </span>
+                            <span className="text-muted-foreground">•</span>
+                            <span className="text-muted-foreground">
+                              Stock: {watch(`variants.${index}.stock`) || 0}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {/* Delete Button */}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const current = watch("variants") || [];
+                              if (current.length > 1) {
+                                reset({ ...watch(), variants: current.filter((_, i) => i !== index) });
+                              }
+                            }}
+                            disabled={(watchedValues.variants || []).length === 1}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+
+                          {/* Expand/Collapse Icon */}
+                          {expandedIndex === index ? (
+                            <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Expandable Content */}
+                      {expandedIndex === index && (
+                        <div className="p-4 pt-0 border-t bg-muted/30">
+                          <div className="grid gap-4 md:grid-cols-3 pt-4">
+                            {/* SKU */}
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">SKU</Label>
+                              <Input
+                                placeholder="SKU-123"
+                                {...register(`variants.${index}.sku`)}
+                                className={errors.variants?.[index]?.sku ? "border-destructive" : ""}
+                              />
+                              {errors.variants?.[index]?.sku && (
+                                <p className="text-xs text-destructive">{errors.variants[index]?.sku?.message}</p>
+                              )}
+                            </div>
+
+                            {/* Price */}
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">Price (BDT)</Label>
+                              <Input
+                                type="number"
+                                step="1"
+                                placeholder="0"
+                                {...register(`variants.${index}.price`, { valueAsNumber: true })}
+                                className={errors.variants?.[index]?.price ? "border-destructive" : ""}
+                              />
+                              {errors.variants?.[index]?.price && (
+                                <p className="text-xs text-destructive">{errors.variants[index]?.price?.message}</p>
+                              )}
+                            </div>
+
+                            {/* Stock */}
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">Stock</Label>
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                {...register(`variants.${index}.stock`, { valueAsNumber: true })}
+                                className={errors.variants?.[index]?.stock ? "border-destructive" : ""}
+                              />
+                              {errors.variants?.[index]?.stock && (
+                                <p className="text-xs text-destructive">{errors.variants[index]?.stock?.message}</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Attributes Section */}
+                          <div className="mt-4 space-y-3">
+                            <Label className=" text-muted-foreground">Attributes</Label>
+                            <div className="flex flex-wrap gap-3">
+                              {attributes.map((attr) => (
+                                <Controller
+                                  key={attr.id}
+                                  name={`variants.${index}.attributes`}
+                                  control={control}
+                                  render={({ field }) => {
+                                    const currentAttr = (field.value || []).find((a) => a.attributeId === attr.id);
+                                    const selectedValue = attributeValues.find((av) => av.id === currentAttr?.valueId);
+
+                                    return (
+                                      <div className="space-y-1">
+                                        <span className="text-xs font-medium text-muted-foreground block">{attr.name}</span>
+                                        <Select
+                                          value={currentAttr ? String(currentAttr.valueId) : ""}
+                                          onValueChange={(val) => {
+                                            const newAttrs = (field.value || []).filter((a) => a.attributeId !== attr.id);
+                                            newAttrs.push({ attributeId: attr.id, valueId: Number(val) });
+                                            field.onChange(newAttrs);
+                                          }}
+                                        >
+                                          <SelectTrigger className="w-[140px] h-9">
+                                            <SelectValue placeholder={`Select ${attr.name}`} />
+                                          </SelectTrigger>
+                                          <SelectContent className="bg-white">
+                                            {attributeValues
+                                              .filter((av) => av.attributeId === attr.id)
+                                              .map((val) => (
+                                                <SelectItem key={val.id} value={String(val.id)}>
+                                                  {val.value}
+                                                </SelectItem>
+                                              ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    );
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Status Toggle (for existing variants) */}
+                          {backendVariant?.id && (
+                            <div className="mt-4 pt-4 border-t flex items-center justify-between">
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Variant Status</Label>
+                                <p className="text-xs text-muted-foreground">
+                                  {backendVariant.isActive
+                                    ? "This variant is visible to customers"
+                                    : "This variant is hidden from customers"}
+                                </p>
+                              </div>
                               <Switch
                                 checked={backendVariant.isActive ?? true}
                                 onCheckedChange={() => handleToggleVariantActive(backendVariant.id)}
                                 disabled={togglingVariantId === backendVariant.id}
                               />
-                              <span className={`text-xs font-medium ${backendVariant.isActive ? "text-green-600" : "text-muted-foreground"}`}>
-                                {backendVariant.isActive ? "Active" : "Inactive"}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">New</span>
+                            </div>
                           )}
                         </div>
-                      </div>
-
-                      {/* SKU */}
-                      <div className="space-y-2 md:col-span-2">
-                        <Label>SKU</Label>
-                        <Input
-                          placeholder="SKU-123"
-                          {...register(`variants.${index}.sku`)}
-                          className={errors.variants?.[index]?.sku ? "border-destructive" : ""}
-                        />
-                        {errors.variants?.[index]?.sku && <p className="text-xs text-destructive">{errors.variants[index]?.sku?.message}</p>}
-                      </div>
-
-                      {/* Price */}
-                      <div className="space-y-2 md:col-span-2">
-                        <Label>Price (BDT)</Label>
-                        <Input
-                          type="number"
-                          step="1"
-                          placeholder="0"
-                          {...register(`variants.${index}.price`, { valueAsNumber: true })}
-                          className={errors.variants?.[index]?.price ? "border-destructive" : ""}
-                        />
-                        {errors.variants?.[index]?.price && <p className="text-xs text-destructive">{errors.variants[index]?.price?.message}</p>}
-                      </div>
-
-                      {/* Stock */}
-                      <div className="space-y-2 md:col-span-2">
-                        <Label>Stock</Label>
-                        <Input
-                          type="number"
-                          placeholder="0"
-                          {...register(`variants.${index}.stock`, { valueAsNumber: true })}
-                          className={errors.variants?.[index]?.stock ? "border-destructive" : ""}
-                        />
-                        {errors.variants?.[index]?.stock && <p className="text-xs text-destructive">{errors.variants[index]?.stock?.message}</p>}
-                      </div>
-
-                      {/* Attributes */}
-                      <div className="md:col-span-3">
-                        <Label className="text-sm mb-2 block">Attributes</Label>
-                        <div className="space-y-2">
-                          {attributes.map((attr) => (
-                            <Controller
-                              key={attr.id}
-                              name={`variants.${index}.attributes`}
-                              control={control}
-                              render={({ field }) => {
-                                const currentAttr = (field.value || []).find((a) => a.attributeId === attr.id);
-                                return (
-                                  <Select
-                                    value={currentAttr ? String(currentAttr.valueId) : ""}
-                                    onValueChange={(val) => {
-                                      const newAttrs = (field.value || []).filter((a) => a.attributeId !== attr.id);
-                                      newAttrs.push({ attributeId: attr.id, valueId: Number(val) });
-                                      field.onChange(newAttrs);
-                                    }}
-                                  >
-                                    <SelectTrigger className="h-8 text-xs">
-                                      <SelectValue placeholder={attr.name} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {attributeValues.filter((av) => av.attributeId === attr.id).map((val) => (
-                                        <SelectItem key={val.id} value={String(val.id)}>{val.value}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                );
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Delete */}
-                      <div className="flex items-end md:col-span-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            const current = watch("variants") || [];
-                            if (current.length > 1) {
-                              reset({ ...watch(), variants: current.filter((_, i) => i !== index) });
-                            }
-                          }}
-                          disabled={(watchedValues.variants || []).length === 1}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      )}
                     </div>
                   );
                 })}
