@@ -78,6 +78,7 @@ export interface Order {
   addressId?: number;
   address?: OrderAddress;
   pagination?: OrderPagination;
+  orderNumber: null | number
 }
 
 // Input types for updating order status

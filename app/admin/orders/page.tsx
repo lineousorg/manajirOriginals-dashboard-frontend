@@ -127,7 +127,7 @@ const OrderDetailsModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Order #${orderId}`}
+      title={`Order #${order?.orderNumber}`}
       description="View order details and items"
       size="xl"
     >
@@ -606,7 +606,7 @@ const OrdersPage = () => {
                         className="border-b last:border-0 hover:bg-muted/30 transition-colors"
                       >
                         <TableCell>
-                          <span className="font-medium">#{order.id}</span>
+                          <span className="font-medium">#{order.orderNumber}</span>
                         </TableCell>
                         <TableCell>
                           <div>
