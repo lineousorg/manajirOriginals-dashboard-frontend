@@ -52,6 +52,7 @@ interface VariantCardProps {
   watch: UseFormWatch<ProductFormData>;
   setValue: UseFormSetValue<ProductFormData>;
   errors: FieldErrors<ProductFormData>;
+  productName?: string;
 }
 
 export default function VariantCard({
@@ -70,6 +71,7 @@ export default function VariantCard({
   watch,
   setValue,
   errors,
+  productName = "",
 }: VariantCardProps) {
   return (
     <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
@@ -246,6 +248,25 @@ export default function VariantCard({
                           currentAttrs.push({ attributeId: attr.id, valueId: newVal });
                         }
                         setValue(`variants.${index}.attributes`, currentAttrs);
+
+                        // Auto-generate SKU when attributes change
+                        const attrs = watch(`variants.${index}.attributes`) || [];
+                        const nameSku = productName
+                          .toUpperCase()
+                          .replace(/[^A-Z\s-]/g, "")
+                          .split(/\s+/)
+                          .filter(Boolean)
+                          .map((word) => word[0])
+                          .join("");
+                        const attrValueMap: Record<number, string> = {};
+                        attributeValues.forEach((av) => {
+                          attrValueMap[av.id] = av.value.substring(0, 3).toUpperCase();
+                        });
+                        const attrCodes = attrs
+                          .map((a) => attrValueMap[a.valueId] || "")
+                          .filter(Boolean);
+                        const newSku = `${nameSku}-${attrCodes.join("-")}-${index + 1}`.toUpperCase();
+                        setValue(`variants.${index}.sku`, newSku);
                       }}
                     >
                       <SelectTrigger className="w-[140px] h-9">

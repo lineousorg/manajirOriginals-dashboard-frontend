@@ -226,7 +226,7 @@ const AttributesPage = () => {
           {isLoading ? (
             <TableSkeleton />
           ) : (
-            <div className="border rounded-lg">
+            <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -254,7 +254,7 @@ const AttributesPage = () => {
                     </TableRow>
                   ) : (
                     filteredAttributes.map((attribute) => (
-                      <div key={attribute.id}>
+                      <>
                         <TableRow>
                           <TableCell>
                             <Button
@@ -336,7 +336,7 @@ const AttributesPage = () => {
                             </TableCell>
                           </TableRow>
                         )}
-                      </div>
+                      </>
                     ))
                   )}
 

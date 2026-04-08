@@ -61,6 +61,7 @@ export interface Product {
 
 // Input types for creating/updating products
 export interface ProductImage {
+  id?: number;
   url: string;
   altText: string;
   position: number;

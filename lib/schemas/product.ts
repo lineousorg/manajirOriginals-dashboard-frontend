@@ -5,6 +5,7 @@ export const productSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   description: z.string().min(1, "Description is required").max(500),
   categoryId: z.number().min(1, "Category is required"),
+  isActive: z.boolean().optional(),
   variants: z.array(
     z.object({
       id: z.number().optional(), // Variant ID for updates
@@ -42,6 +43,7 @@ export const INITIAL_FORM = {
   name: "",
   description: "",
   categoryId: 0,
+  isActive: true,
   variants: [INITIAL_VARIANT],
   images: [],
 } as const;

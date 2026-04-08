@@ -11,32 +11,94 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FormSkeleton } from "@/components/ui/skeleton-card";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useProduct } from "@/hooks/useProduct";
 import { useCategories } from "@/hooks/useCategories";
 import { useAttributes } from "@/hooks/useAttributes";
 import { useAttributeValues } from "@/hooks/useAttributeValues";
 import { productsApi } from "@/services/api";
-import { productSchema, ProductFormData, INITIAL_FORM } from "@/lib/schemas/product";
+import {
+  productSchema,
+  ProductFormData,
+  INITIAL_FORM,
+} from "@/lib/schemas/product";
 import { transformVariantAttributes } from "@/lib/utils/product";
 import VariantCard from "@/components/product/VariantCard";
 import ProductImageGallery from "@/components/product/ProductImageGallery";
+
+// Helper function to generate SKU based on product name and variant attributes
+const generateSKU = (
+  productName: string,
+  attributes: Array<{ attributeId: number; valueId: number }>,
+  attributeValues: Array<{ id: number; value: string; attributeId: number }>,
+  variantIndex: number,
+): string => {
+  // Convert product name to uppercase without spaces, limit to first 5 characters
+  const words = productName
+    .toUpperCase()
+    .replace(/[^A-Z\s-]/g, "")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (words.length === 0) return "";
+
+  const initials = words.map((word) => word[0]).join("");
+
+  const lastWordConsonants = words[words.length - 1]
+    .slice(1)
+    .replace(/[AEIOU]/g, "");
+
+  const nameSku = initials + lastWordConsonants;
+
+  // Get attribute values from the actual data
+  const attrValueMap: Record<number, string> = {};
+  attributeValues.forEach((av) => {
+    // Get first 3 characters of value, uppercase
+    attrValueMap[av.id] = av.value.substring(0, 3).toUpperCase();
+  });
+
+  // Build SKU with attribute values
+  const attrCodes = attributes
+    .map((a) => attrValueMap[a.valueId] || "")
+    .filter(Boolean);
+
+  // Format: NAME-ATTR1-ATTR2-VARIANTNUM (e.g., TSHIRT-RED-BLK-1)
+  return `${nameSku}-${attrCodes.join("-")}-${variantIndex + 1}`.toUpperCase();
+};
 
 export default function EditProductPage() {
   const params = useParams<{ id: string }>();
   const id = Number(params?.id);
   const router = useRouter();
 
-  const { product, isLoading: isLoadingProduct, error, setProduct } = useProduct(id);
+  const {
+    product,
+    isLoading: isLoadingProduct,
+    error,
+    setProduct,
+  } = useProduct(id);
   const { categories, isLoading: isLoadingCategories } = useCategories();
   const { attributes } = useAttributes();
   const { attributeValues } = useAttributeValues();
   const { toast } = useToast();
 
-  const [togglingVariantId, setTogglingVariantId] = useState<number | null>(null);
-  const [dataReady, setDataReady] = useState(false);
+  const [togglingVariantId, setTogglingVariantId] = useState<number | null>(
+    null
+  );
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
   const [initialized, setInitialized] = useState(false);
+  const [originalData, setOriginalData] = useState<{
+    name: string;
+    description: string;
+    categoryId: number;
+    isActive: boolean;
+    variants: Array<{ id?: number; sku: string; price: number; stock: number }>;
+    images: Array<{ id?: number; url: string; altText: string; position: number }>;
+  } | null>(null);
+
+  // Filter active variants once - used throughout the component
+  const activeVariants = product?.variants.filter((v) => !v.isDeleted) || [];
 
   const {
     register,
@@ -51,24 +113,18 @@ export default function EditProductPage() {
     defaultValues: INITIAL_FORM as unknown as ProductFormData,
   });
 
-  // Wait for ALL data and reset ONLY ONCE
-  const isReady =
-    product &&
-    categories.length > 0 &&
-    attributes.length > 0 &&
-    attributeValues.length > 0;
+  // Wait for product and categories data before form initialization
+  const isReady = product && categories.length > 0;
 
   useEffect(() => {
     if (!initialized && isReady) {
-      // Filter out soft-deleted variants
-      const activeVariants = product.variants.filter((v) => !v.isDeleted);
-      
       reset({
         name: product.name,
         description: product.description,
         categoryId: product.categoryId,
+        isActive: product.isActive,
         variants: activeVariants.map((v) => ({
-          id: v.id, // Include variant ID for updates
+          id: v.id,
           sku: v.sku || "",
           price: Number(v.price) || 0,
           stock: v.stock,
@@ -76,10 +132,31 @@ export default function EditProductPage() {
         })),
         images: product.images || [],
       });
-      setDataReady(true);
+      // Store original data for dirty checking
+      setOriginalData({
+        name: product.name,
+        description: product.description,
+        categoryId: product.categoryId,
+        isActive: product.isActive,
+        variants: activeVariants.map((v) => ({
+          id: v.id,
+          sku: v.sku || "",
+          price: Number(v.price) || 0,
+          stock: v.stock,
+        })),
+        images:
+          product.images
+            ?.filter((img) => img.url?.trim())
+            .map((img, index) => ({
+              id: img.id,
+              url: img.url,
+              altText: img.altText || "",
+              position: index,
+            })) || [],
+      });
       setInitialized(true);
     }
-  }, [isReady, product, reset, initialized]);
+  }, [isReady, product, categories, reset, initialized]);
 
   const handleToggleVariantActive = useCallback(
     async (variantId: number) => {
@@ -89,7 +166,9 @@ export default function EditProductPage() {
         setProduct(updated);
         const variant = updated.variants.find((v) => v.id === variantId);
         toast({
-          title: variant?.isActive ? "Variant activated" : "Variant deactivated",
+          title: variant?.isActive
+            ? "Variant activated"
+            : "Variant deactivated",
           description: "Variant status updated.",
         });
       } catch {
@@ -107,30 +186,99 @@ export default function EditProductPage() {
 
   const onSubmit = useCallback(
     async (data: ProductFormData) => {
-      if (!id) return;
+      if (!id || !originalData) return;
 
       try {
-        const updateData = {
-          name: data.name,
-          description: data.description,
-          categoryId: data.categoryId,
-          variants: data.variants.map((v) => ({
-            id: v.id, // Include variant ID for existing variants
-            sku: v.sku,
-            price: v.price,
-            stock: v.stock,
-            attributes: v.attributes, // Only sent for new variants
-          })),
-          images: data.images
-            ?.filter((img) => img.url?.trim())
-            ?.map((img, index) => ({
-              url: img.url,
-              altText: img.altText || "",
-              position: index,
-            })) || [],
-        };
+        // Build update payload with only changed fields
+        const updateFields: Record<string, unknown> = {};
 
-        await productsApi.update(id, updateData);
+        // Check if name changed
+        if (data.name !== originalData.name) {
+          updateFields.name = data.name;
+        }
+
+        // Check if description changed
+        if (data.description !== originalData.description) {
+          updateFields.description = data.description;
+        }
+
+        // Check if category changed
+        if (data.categoryId !== originalData.categoryId) {
+          updateFields.categoryId = data.categoryId;
+        }
+
+        // Check if isActive changed
+        if (data.isActive !== originalData.isActive) {
+          updateFields.isActive = data.isActive;
+        }
+
+        // Check if variants changed - only include changed variants with IDs
+        const changedVariants = data.variants
+          .map((v, i) => {
+            const original = originalData.variants[i];
+            if (!original) return null; // Skip new variants (they won't have id)
+            
+            const hasChanged = 
+              v.sku !== original.sku ||
+              v.price !== original.price ||
+              v.stock !== original.stock;
+            
+            if (!hasChanged) return null;
+            
+            // Build variant payload - include id if available
+            const variantPayload: Record<string, unknown> = {};
+            if (original.id) variantPayload.id = original.id;
+            variantPayload.sku = v.sku;
+            variantPayload.price = v.price;
+            variantPayload.stock = v.stock;
+            
+            return variantPayload;
+          })
+          .filter(Boolean);
+
+        if (changedVariants.length > 0) {
+          updateFields.variants = changedVariants;
+        }
+
+        // Check if images changed
+        const currentImages = data.images
+          ?.filter((img) => img.url?.trim())
+          ?.map((img, index) => {
+            const original = originalData.images[index];
+            const hasChanged = 
+              img.url !== original?.url ||
+              img.altText !== original?.altText;
+            
+            if (!hasChanged && original?.id) return null;
+            
+            // Build image payload - include id if available
+            const imagePayload: Record<string, unknown> = {};
+            if (original?.id) imagePayload.id = original.id;
+            imagePayload.url = img.url;
+            if (img.altText) imagePayload.altText = img.altText;
+            imagePayload.position = index;
+            
+            return imagePayload;
+          })
+          .filter(Boolean) || [];
+
+        if (currentImages.length > 0) {
+          updateFields.images = currentImages;
+        }
+
+        // Don't send request if nothing changed
+        if (Object.keys(updateFields).length === 0) {
+          toast({
+            title: "No changes",
+            description: "No fields were modified.",
+          });
+          return;
+        }
+
+        await productsApi.update(
+          id,
+          updateFields as unknown as import("@/types/product").UpdateProductInput
+        );
         toast({
           title: "Product updated",
           description: `${data.name} has been updated successfully.`,
@@ -144,7 +292,7 @@ export default function EditProductPage() {
         });
       }
     },
-    [id, router, toast]
+    [id, router, toast, originalData]
   );
 
   const handleVariantRemove = (index: number) => {
@@ -157,14 +305,24 @@ export default function EditProductPage() {
 
   const handleVariantAdd = () => {
     const current = watch("variants") || [];
+    const productName = watch("name") || "";
+    
+    // Generate SKU for the new variant
+    const newSku = generateSKU(
+      productName,
+      [], // No attributes selected yet
+      attributeValues,
+      current.length, // Use current length as index
+    );
+    
     setValue("variants", [
       ...current,
-      { sku: "", price: 0, stock: 0, attributes: [] },
+      { sku: newSku, price: 0, stock: 0, attributes: [] },
     ]);
   };
 
   // Loading state
-  if (isLoadingProduct || !dataReady) {
+  if (isLoadingProduct || !initialized || isLoadingCategories) {
     return (
       <PageTransition>
         <div className="max-w-4xl mx-auto space-y-6">
@@ -202,20 +360,35 @@ export default function EditProductPage() {
     );
   }
 
-  const watchedValues = watch();
-  const variants = watchedValues.variants || [];
+  const variants = watch("variants") || [];
 
   return (
     <PageTransition>
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
-        <FadeIn className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push("/admin/products")}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Edit Product</h1>
-            <p className="text-muted-foreground">Update {product.name}</p>
+        <FadeIn className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push("/admin/products")}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">Edit Product</h1>
+              <p className="text-muted-foreground">Update {product.name}</p>
+            </div>
+          </div>
+          {/* Active Status Toggle */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              {watch("isActive") ? "Active" : "Inactive"}
+            </span>
+            <Switch
+              checked={watch("isActive") ?? false}
+              onCheckedChange={(checked) => setValue("isActive", checked)}
+            />
           </div>
         </FadeIn>
 
@@ -258,8 +431,10 @@ export default function EditProductPage() {
                   <Label>Category</Label>
                   <select
                     className="w-full px-3 py-2 border rounded-md bg-background"
-                    value={watch("categoryId") || ""}
-                    onChange={(e) => setValue("categoryId", Number(e.target.value))}
+                    {...register("categoryId", {
+                      setValueAs: (v) => (v === "" ? undefined : Number(v)),
+                    })}
+               
                   >
                     <option value="">Select Category</option>
                     {categories.map((cat) => (
@@ -267,6 +442,13 @@ export default function EditProductPage() {
                         {cat.name}
                       </option>
                     ))}
+                    {/* Show current category if not in list */}
+                    {product?.categoryId &&
+                      !categories.find((c) => c.id === product.categoryId) && (
+                        <option value={product.categoryId}>
+                          {product.category.name} (Current)
+                        </option>
+                      )}
                   </select>
                   {errors.categoryId && (
                     <p className="text-sm text-destructive">
@@ -283,13 +465,20 @@ export default function EditProductPage() {
             <div className="bg-card rounded-lg border p-6 shadow-card space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">Product Variants</h2>
-                <Button type="button" variant="outline" size="sm" onClick={handleVariantAdd}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleVariantAdd}
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Variant
                 </Button>
               </div>
               {errors.variants?.root && (
-                <p className="text-sm text-destructive">{errors.variants.root.message}</p>
+                <p className="text-sm text-destructive">
+                  {errors.variants.root.message}
+                </p>
               )}
 
               <div className="space-y-4">
@@ -298,7 +487,7 @@ export default function EditProductPage() {
                     key={index}
                     index={index}
                     variant={variant}
-                    backendVariant={product.variants[index]}
+                    backendVariant={activeVariants[index]}
                     attributes={attributes}
                     attributeValues={attributeValues}
                     isExpanded={expandedIndex === index}
@@ -307,16 +496,18 @@ export default function EditProductPage() {
                     }
                     onRemove={() => handleVariantRemove(index)}
                     onToggleActive={
-                      product.variants[index]?.id
-                        ? () => handleToggleVariantActive(product.variants[index].id)
+                      activeVariants[index]?.id
+                        ? () =>
+                            handleToggleVariantActive(activeVariants[index].id)
                         : undefined
                     }
-                    isToggling={togglingVariantId === product.variants[index]?.id}
+                    isToggling={togglingVariantId === activeVariants[index]?.id}
                     register={register}
                     control={control}
                     watch={watch}
                     setValue={setValue}
                     errors={errors}
+                    productName={watch("name")}
                   />
                 ))}
               </div>
@@ -330,7 +521,8 @@ export default function EditProductPage() {
                 images={(watch("images") || []).map((img, idx) => ({
                   url: img.url,
                   altText: img.altText || "",
-                  position: typeof img.position === 'number' ? img.position : idx,
+                  position:
+                    typeof img.position === "number" ? img.position : idx,
                 }))}
                 onUpload={(imgs) => setValue("images", imgs)}
                 onRemove={(idx) => {
@@ -351,7 +543,11 @@ export default function EditProductPage() {
 
           {/* Actions */}
           <FadeIn delay={0.4} className="flex gap-4 justify-end">
-            <Button type="button" variant="outline" onClick={() => router.push("/admin/products")}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.push("/admin/products")}
+            >
               Cancel
             </Button>
             <Button
