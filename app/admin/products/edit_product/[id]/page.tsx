@@ -60,11 +60,15 @@ export default function EditProductPage() {
 
   useEffect(() => {
     if (!initialized && isReady) {
+      // Filter out soft-deleted variants
+      const activeVariants = product.variants.filter((v) => !v.isDeleted);
+      
       reset({
         name: product.name,
         description: product.description,
         categoryId: product.categoryId,
-        variants: product.variants.map((v) => ({
+        variants: activeVariants.map((v) => ({
+          id: v.id, // Include variant ID for updates
           sku: v.sku || "",
           price: Number(v.price) || 0,
           stock: v.stock,
@@ -111,10 +115,11 @@ export default function EditProductPage() {
           description: data.description,
           categoryId: data.categoryId,
           variants: data.variants.map((v) => ({
+            id: v.id, // Include variant ID for existing variants
             sku: v.sku,
             price: v.price,
             stock: v.stock,
-            attributes: v.attributes,
+            attributes: v.attributes, // Only sent for new variants
           })),
           images: data.images
             ?.filter((img) => img.url?.trim())

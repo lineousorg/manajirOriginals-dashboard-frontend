@@ -83,8 +83,17 @@ export interface CreateVariantInput {
   isActive?: boolean;
 }
 
+export interface UpdateVariantInput {
+  id?: number;
+  sku: string;
+  price: number;
+  stock: number;
+  attributes?: VariantAttributeForm[];
+  isActive?: boolean;
+}
+
 export interface UpdateProductInput extends Partial<CreateProductInput> {
-  variants?: CreateVariantInput[];
+  variants?: UpdateVariantInput[];
 }
 
 // API Response wrapper types

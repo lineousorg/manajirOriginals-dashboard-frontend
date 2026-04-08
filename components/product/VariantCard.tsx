@@ -198,24 +198,40 @@ export default function VariantCard({
             </div>
           </div>
 
-          {/* Attributes Section */}
+          {/* Attributes Section - Read-only for existing variants, editable for new variants */}
           <div className="mt-4 space-y-3">
             <Label className="text-muted-foreground">Attributes</Label>
             <div className="flex flex-wrap gap-3">
               {attributes.map((attr) => {
                 const formValues = watch(`variants.${index}.attributes`) || [];
-                // Find the actual index of this attribute in the form values array
-                const formAttrIndex = formValues.findIndex(
-                  (a) => a.attributeId === attr.id
-                );
-                const attrValue = formValues.find(
-                  (a) => a.attributeId === attr.id
-                );
+                const attrValue = formValues.find((a) => a.attributeId === attr.id);
                 const currentValueId = attrValue?.valueId || 0;
-                const filteredValues = attributeValues.filter(
-                  (av) => av.attributeId === attr.id
-                );
+                const filteredValues = attributeValues.filter((av) => av.attributeId === attr.id);
 
+                // For existing variants (backendVariant.id exists), show read-only display
+                // Get the attribute value directly from backend data
+                const isExistingVariant = !!backendVariant?.id;
+                
+                if (isExistingVariant) {
+                  // Get attribute value from backend data
+                  const backendAttr = backendVariant?.attributes?.find(
+                    (a) => a.attributeValue?.attribute?.id === attr.id
+                  );
+                  const backendValue = backendAttr?.attributeValue?.value || "N/A";
+                  
+                  return (
+                    <div key={attr.id} className="space-y-1">
+                      <span className="text-xs font-medium text-muted-foreground block">
+                        {attr.name}
+                      </span>
+                      <div className="w-[140px] h-9 px-3 py-2 border rounded-md bg-muted/50 text-sm flex items-center">
+                        {backendValue}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // New variants: Allow editing
                 return (
                   <div key={attr.id} className="space-y-1">
                     <span className="text-xs font-medium text-muted-foreground block">
@@ -225,14 +241,9 @@ export default function VariantCard({
                       value={currentValueId ? String(currentValueId) : ""}
                       onValueChange={(val) => {
                         const newVal = Number(val);
-                        const currentAttrs = (
-                          watch(`variants.${index}.attributes`) || []
-                        ).filter((a) => a.attributeId !== attr.id);
+                        const currentAttrs = (watch(`variants.${index}.attributes`) || []).filter((a) => a.attributeId !== attr.id);
                         if (newVal > 0) {
-                          currentAttrs.push({
-                            attributeId: attr.id,
-                            valueId: newVal,
-                          });
+                          currentAttrs.push({ attributeId: attr.id, valueId: newVal });
                         }
                         setValue(`variants.${index}.attributes`, currentAttrs);
                       }}

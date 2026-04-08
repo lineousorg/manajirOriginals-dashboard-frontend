@@ -7,6 +7,7 @@ export const productSchema = z.object({
   categoryId: z.number().min(1, "Category is required"),
   variants: z.array(
     z.object({
+      id: z.number().optional(), // Variant ID for updates
       sku: z.string().min(1, "SKU is required"),
       price: z.number().min(0, "Price must be positive"),
       stock: z.number().min(0, "Stock must be positive"),

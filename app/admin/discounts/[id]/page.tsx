@@ -86,7 +86,7 @@ const EditDiscountPage = () => {
         setCategories(cats);
 
         // Flatten all variants
-        const allVariants = prods.flatMap((p) =>
+        const allVariants = prods.data.flatMap((p) =>
           p.variants.map((v) => ({
             ...v,
             productName: p.name,
