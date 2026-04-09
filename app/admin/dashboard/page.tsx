@@ -186,7 +186,7 @@ export default function DashboardPage() {
                           {index + 1}
                         </div>
                         <div>
-                          <p className="font-medium text-sm">Order #{order.id}</p>
+                          <p className="font-medium text-sm">Order #{order.orderNumber}</p>
                           <p className="text-xs text-muted-foreground">
                             {order.items?.length || 0} items • {formatCurrency(order.total)}
                           </p>

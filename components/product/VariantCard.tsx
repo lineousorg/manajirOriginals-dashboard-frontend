@@ -7,7 +7,7 @@ import {
   FieldErrors,
   Control,
 } from "react-hook-form";
-import { Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ChevronUp, ChevronDown, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -47,6 +47,7 @@ interface VariantCardProps {
   onRemove: () => void;
   onToggleActive?: () => void;
   isToggling?: boolean;
+  isDeleting?: boolean;
   register: UseFormRegister<ProductFormData>;
   control: Control<ProductFormData>;
   watch: UseFormWatch<ProductFormData>;
@@ -66,6 +67,7 @@ export default function VariantCard({
   onRemove,
   onToggleActive,
   isToggling,
+  isDeleting,
   register,
   control,
   watch,
@@ -118,12 +120,17 @@ export default function VariantCard({
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-destructive hover:text-destructive"
+            disabled={isDeleting}
             onClick={(e) => {
               e.stopPropagation();
               onRemove();
             }}
           >
-            <Trash2 className="w-4 h-4" />
+            {isDeleting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Trash2 className="w-4 h-4" />
+            )}
           </Button>
 
           {/* Expand/Collapse Icon */}
