@@ -407,7 +407,7 @@ export default function EditProductPage() {
         });
       }
     },
-    [id, router, toast, originalData],
+    [id, router, toast, originalData], 
   );
 
   const handleVariantAdd = () => {
