@@ -610,9 +610,9 @@ const OrdersPage = () => {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{order.user.email}</p>
+                            <p className="font-medium">{order?.user?.email}</p>
                             <p className="text-sm text-muted-foreground">
-                              User ID: {order.userId}
+                              User ID: {order?.userId}
                             </p>
                           </div>
                         </TableCell>
