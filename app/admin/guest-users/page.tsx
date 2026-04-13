@@ -7,10 +7,10 @@ import {
   Mail,
   Phone,
   Calendar,
-  Shield,
+  MapPin,
 } from "lucide-react";
-import { useUsers } from "@/hooks/useUsers";
-import { User } from "@/types/user";
+import { useGuestUsers } from "@/hooks/useGuestUsers";
+import { GuestUser } from "@/types/user";
 import { PageTransition, FadeIn } from "@/components/ui/motion";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,25 +22,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableSkeleton } from "@/components/ui/skeleton-card";
-import { cn } from "@/lib/utils";
 
-const UsersPage = () => {
-  const { users, isLoading } = useUsers();
+const GuestUsersPage = () => {
+  const { guestUsers, isLoading, pagination } = useGuestUsers();
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredUsers = useMemo(() => {
-    if (!Array.isArray(users)) return [];
-    return users.filter((user) => {
+  const filteredGuestUsers = useMemo(() => {
+    if (!Array.isArray(guestUsers)) return [];
+    return guestUsers.filter((user) => {
       const searchLower = searchQuery.toLowerCase();
       return (
         user.email.toLowerCase().includes(searchLower) ||
         user.name?.toLowerCase().includes(searchLower) ||
-        user.firstName?.toLowerCase().includes(searchLower) ||
-        user.lastName?.toLowerCase().includes(searchLower) ||
+        user.phone?.includes(searchLower) ||
         user.id.toString().includes(searchLower)
       );
     });
-  }, [users, searchQuery]);
+  }, [guestUsers, searchQuery]);
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "-";
@@ -51,23 +49,16 @@ const UsersPage = () => {
     });
   };
 
-  const getUserDisplayName = (user: User) => {
-    if (user.name) return user.name;
-    if (user.firstName || user.lastName) {
-      return `${user.firstName || ""} ${user.lastName || ""}`.trim();
+  const getInitials = (user: GuestUser) => {
+    if (user.name) {
+      return user.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
     }
-    return "N/A";
-  };
-
-  const getInitials = (user: User) => {
-    const name = getUserDisplayName(user);
-    if (name === "N/A") return user.email.slice(0, 2).toUpperCase();
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+    return user.email.slice(0, 2).toUpperCase();
   };
 
   return (
@@ -76,8 +67,8 @@ const UsersPage = () => {
         {/* Header */}
         <FadeIn>
           <div>
-            <h1 className="text-2xl font-bold">Users</h1>
-            <p className="text-muted-foreground">Manage your platform users</p>
+            <h1 className="text-2xl font-bold">Guest Users</h1>
+            <p className="text-muted-foreground">Manage unregistered customers</p>
           </div>
         </FadeIn>
 
@@ -86,7 +77,7 @@ const UsersPage = () => {
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search users..."
+              placeholder="Search guest users..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -98,7 +89,7 @@ const UsersPage = () => {
         <FadeIn delay={0.2}>
           {isLoading ? (
             <TableSkeleton rows={5} />
-          ) : filteredUsers.length === 0 ? (
+          ) : filteredGuestUsers.length === 0 ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -107,11 +98,11 @@ const UsersPage = () => {
               <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
                 <UserIcon className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-medium mb-2">No users found</h3>
+              <h3 className="text-lg font-medium mb-2">No guest users found</h3>
               <p className="text-muted-foreground">
                 {searchQuery
                   ? "Try adjusting your search"
-                  : "Users will appear here when they register"}
+                  : "Guest users will appear here when they place orders"}
               </p>
             </motion.div>
           ) : (
@@ -121,14 +112,14 @@ const UsersPage = () => {
                   <TableRow className="bg-muted/50">
                     <TableHead>User</TableHead>
                     <TableHead>Email</TableHead>
-                    {/* <TableHead>Phone</TableHead> */}
-                    <TableHead>Role</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Address</TableHead>
                     <TableHead>Joined</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   <AnimatePresence mode="popLayout">
-                    {filteredUsers.map((user, index) => (
+                    {filteredGuestUsers.map((user, index) => (
                       <motion.tr
                         key={user.id}
                         initial={{ opacity: 0, y: 20 }}
@@ -145,7 +136,7 @@ const UsersPage = () => {
                               </span>
                             </div>
                             <div>
-                              <p className="font-medium">{user.email}</p>
+                              <p className="font-medium">{user.name || "N/A"}</p>
                               <p className="text-sm text-muted-foreground">
                                 ID: {user.id}
                               </p>
@@ -158,26 +149,23 @@ const UsersPage = () => {
                             <span>{user.email}</span>
                           </div>
                         </TableCell>
-                        {/* <TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-2">
                             <Phone className="w-4 h-4 text-muted-foreground" />
                             <span className="text-muted-foreground">
                               {user.phone || "-"}
                             </span>
                           </div>
-                        </TableCell> */}
+                        </TableCell>
                         <TableCell>
-                          <span
-                            className={cn(
-                              "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
-                              user.role === "ADMIN"
-                                ? "bg-purple-100 text-purple-700 border-purple-200"
-                                : "bg-blue-100 text-blue-700 border-blue-200"
-                            )}
-                          >
-                            <Shield className="w-3 h-3 mr-1" />
-                            {user.role || "USER"}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-muted-foreground">
+                              {user.address
+                                ? `${user.address}, ${user.city || ""} ${user.postalCode || ""}`
+                                : "-"}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2 text-muted-foreground">
@@ -200,4 +188,4 @@ const UsersPage = () => {
   );
 };
 
-export default UsersPage;
+export default GuestUsersPage;

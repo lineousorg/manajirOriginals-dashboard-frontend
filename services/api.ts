@@ -11,7 +11,7 @@ import {
   UpdateCategoryInput,
 } from "@/types/category";
 import { Order, OrderStatus, UpdateOrderStatusInput } from "@/types/order";
-import { User } from "@/types/user";
+import { User, GuestUser } from "@/types/user";
 import {
   Attribute,
   CreateAttributeInput,
@@ -242,6 +242,14 @@ export const usersApi = {
   getById: async (id: number): Promise<User> => {
     const response = await api.get(`/users/${id}`);
     return response.data.data;
+  },
+};
+
+// Guest Users API
+export const guestUsersApi = {
+  getAll: async (params?: PaginationParams): Promise<PaginatedResponse<GuestUser>> => {
+    const response = await api.get("/guest-users", { params });
+    return response.data;
   },
 };
 

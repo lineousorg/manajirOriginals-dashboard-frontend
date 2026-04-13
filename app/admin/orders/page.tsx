@@ -127,7 +127,12 @@ const OrderDetailsModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Order #${order?.orderNumber}`}
+      title={
+        <>
+          Order #
+          {order?.orderNumber == null || undefined ? <small className="text-xs">Loading...</small> : order.orderNumber}
+        </>
+      }
       description="View order details and items"
       size="xl"
     >
@@ -145,20 +150,30 @@ const OrderDetailsModal = ({
             <div className="p-4 rounded-lg bg-muted/50">
               <div className="flex items-center gap-2 text-muted-foreground mb-2">
                 <User className="w-4 h-4" />
-                <span className="text-sm font-medium">Customer</span>
+                <span className="text-sm font-medium">
+                  {order.user ? "Customer" : "Guest Customer"}
+                </span>
               </div>
-              {order.address && (
+              {order.address ? (
                 <>
                   <p className="font-medium">
                     {order.address.firstName} {order.address.lastName}
                   </p>
                   <div className="flex items-center gap-1.5 font-medium">
-                    {/* <Phone className="w-3.5 h-3.5" /> */}
                     <span>{order.address.phone}</span>
                   </div>
                 </>
-              )}
-              <p className="font-medium">{order.user.email}</p>
+              ) : order.guestUser ? (
+                <>
+                  <p className="font-medium">{order.guestUser.name}</p>
+                  <div className="flex items-center gap-1.5 font-medium">
+                    <span>{order.guestUser.phone}</span>
+                  </div>
+                </>
+              ) : null}
+              <p className="font-medium">
+                {order.user?.email || order.guestUser?.email}
+              </p>
             </div>
 
             {/* Address & Phone */}
@@ -305,9 +320,10 @@ const OrdersPage = () => {
   const filteredOrders = useMemo(() => {
     if (!Array.isArray(orders)) return [];
     return orders.filter((order) => {
+      const userEmail = order.user?.email || order.guestUser?.email || "";
       const matchesSearch =
         order.id.toString().includes(searchQuery.toLowerCase()) ||
-        order.user.email.toLowerCase().includes(searchQuery.toLowerCase());
+        userEmail.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus =
         statusFilter === "all" || order.status === statusFilter;
 
@@ -610,9 +626,15 @@ const OrdersPage = () => {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{order?.user?.email}</p>
-                            <p className="text-sm text-muted-foreground">
-                              User ID: {order?.userId}
+                            <p className="font-medium">
+                              {order.user
+                                ? order.user.email
+                                : order.guestUser
+                                  ? order.guestUser.name || order.guestUser.email
+                                  : "N/A"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {order.user ? "Registered User" : "Guest User"}
                             </p>
                           </div>
                         </TableCell>

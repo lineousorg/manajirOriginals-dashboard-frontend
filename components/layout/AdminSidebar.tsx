@@ -14,6 +14,7 @@ import {
   ShoppingCart,
   Tag,
   Percent,
+  UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ const navItems = [
   // { icon: Percent, label: "Discounts", path: "/admin/discounts" },
   { icon: ShoppingCart, label: "Orders", path: "/admin/orders" },
   { icon: Users, label: "Users", path: "/admin/users" },
+  { icon: UserCircle, label: "Guest Users", path: "/admin/guest-users" },
   // { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },
   // { icon: Settings, label: "Settings", path: "/admin/settings" },
 ];

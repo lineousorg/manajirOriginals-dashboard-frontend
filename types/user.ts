@@ -13,6 +13,17 @@ export interface User {
   updatedAt?: string;
 }
 
+export interface GuestUser {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  address?: string;
+  city?: string;
+  postalCode?: string;
+  createdAt: string;
+}
+
 // API Response wrapper type
 export type ApiResponse<T> = {
   message: string;

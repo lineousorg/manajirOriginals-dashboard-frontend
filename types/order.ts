@@ -74,6 +74,7 @@ export interface Order {
   createdAt: string;
   updatedAt: string;
   user: OrderUser;
+  guestUser: { id: number; email: string; name: string; phone: string } | null;
   items?: OrderItem[];
   addressId?: number;
   address?: OrderAddress;
