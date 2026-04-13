@@ -128,10 +128,10 @@ const OrderDetailsModal = ({
       isOpen={isOpen}
       onClose={onClose}
       title={
-        <>
-          Order #
-          {order?.orderNumber == null || undefined ? <small className="text-xs">Loading...</small> : order.orderNumber}
-        </>
+
+        `  Order #
+          ${order?.orderNumber == null || undefined ? <small className="text-xs">Loading...</small> : order.orderNumber}
+        `
       }
       description="View order details and items"
       size="xl"
