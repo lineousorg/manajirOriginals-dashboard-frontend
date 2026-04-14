@@ -127,12 +127,7 @@ const OrderDetailsModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={
-
-        `  Order #
-          ${order?.orderNumber == null || undefined ? <small className="text-xs">Loading...</small> : order.orderNumber}
-        `
-      }
+      title={`Order #${isLoading ? 'Loading...' : order?.orderNumber || 'Loading...'}`}
       description="View order details and items"
       size="xl"
     >
@@ -379,7 +374,11 @@ const OrdersPage = () => {
   const handleDownloadReceipt = async (orderId: number) => {
     try {
       setDownloadingReceipt(orderId);
-      await downloadReceipt(orderId);
+      // Find the order to check if it's a guest order
+      const order = orders.find((o) => o.id === orderId);
+      // For guest orders (no userId), pass the phone number
+      const phone = order?.guestUser?.phone || undefined;
+      await downloadReceipt(orderId, phone);
       toast({
         title: "Receipt downloaded",
         description: `Receipt for Order #${orderId} has been downloaded.`,

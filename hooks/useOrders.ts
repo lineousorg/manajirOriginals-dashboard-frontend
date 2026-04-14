@@ -78,10 +78,10 @@ export const useOrders = () => {
     }
   };
 
-  const downloadReceipt = async (id: number): Promise<void> => {
+  const downloadReceipt = async (id: number, phone?: string): Promise<void> => {
     setError(null);
     try {
-      const blob = await ordersApi.getReceipt(id);
+      const blob = await ordersApi.getReceipt(id, phone);
       // Create a URL for the blob
       const url = window.URL.createObjectURL(blob);
       // Create a temporary link element

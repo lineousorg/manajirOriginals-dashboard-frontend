@@ -224,8 +224,11 @@ export const ordersApi = {
   },
 
   // Download receipt as PDF
-  getReceipt: async (id: number): Promise<Blob> => {
-    const response = await api.get(`/orders/${id}/receipt`, {
+  getReceipt: async (id: number, phone?: string): Promise<Blob> => {
+    const url = phone
+      ? `/orders/${id}/receipt?phone=${phone}`
+      : `/orders/${id}/receipt`;
+    const response = await api.get(url, {
       responseType: "blob",
     });
     return response.data;
