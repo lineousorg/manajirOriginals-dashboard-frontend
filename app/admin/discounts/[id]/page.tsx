@@ -430,7 +430,7 @@ const EditDiscountPage = () => {
                                     } else {
                                       setFormData({
                                         ...formData,
-                                        variantIds: formData.variantIds.filter(
+                                        variantIds: formData.variantIds?.filter(
                                           (id) => id !== variant.id
                                         ),
                                       });

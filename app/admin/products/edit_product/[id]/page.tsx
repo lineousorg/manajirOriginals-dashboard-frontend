@@ -39,7 +39,7 @@ const generateSKU = (
     .toUpperCase()
     .replace(/[^A-Z\s-]/g, "")
     .split(/\s+/)
-    .filter(Boolean);
+    ?.filter(Boolean);
 
   if (words.length === 0) return "";
 
@@ -61,7 +61,7 @@ const generateSKU = (
   // Build SKU with attribute values
   const attrCodes = attributes
     .map((a) => attrValueMap[a.valueId] || "")
-    .filter(Boolean);
+    ?.filter(Boolean);
 
   // Format: NAME-ATTR1-ATTR2-VARIANTNUM (e.g., TSHIRT-RED-BLK-1)
   return `${nameSku}-${attrCodes.join("-")}-${variantIndex + 1}`.toUpperCase();
@@ -106,7 +106,7 @@ export default function EditProductPage() {
   } | null>(null);
 
   // Filter active variants once - used throughout the component
-  const activeVariants = product?.variants.filter((v) => !v.isDeleted) || [];
+  const activeVariants = product?.variants?.filter((v) => !v.isDeleted) || [];
 
   const {
     register,
@@ -188,9 +188,14 @@ export default function EditProductPage() {
     async (variantId: number) => {
       setTogglingVariantId(variantId);
       try {
-        const updated = await productsApi.toggleVariantActive(id, variantId);
-        setProduct(updated);
-        const variant = updated.variants.find((v) => v.id === variantId);
+        // Toggle the variant
+        await productsApi.toggleVariantActive(id, variantId);
+
+        // Refetch the FULL product to ensure we have the complete data
+        const updatedProduct = await productsApi.getById(id);
+        setProduct(updatedProduct);
+
+        const variant = updatedProduct.variants?.find((v) => v.id === variantId);
         toast({
           title: variant?.isActive
             ? "Variant activated"
@@ -224,7 +229,7 @@ export default function EditProductPage() {
           setProduct(updated);
 
           // Reset form with updated product data
-          const updatedActiveVariants = updated.variants.filter(
+          const updatedActiveVariants = updated.variants?.filter(
             (v) => !v.isDeleted,
           );
           reset({
@@ -281,7 +286,7 @@ export default function EditProductPage() {
       } else {
         // New variant (not saved yet) - just remove from local form state
         if (current.length > 1) {
-          const updated = current.filter((_, i) => i !== index);
+          const updated = current?.filter((_, i) => i !== index);
           setValue("variants", updated);
         }
       }
@@ -317,14 +322,18 @@ export default function EditProductPage() {
           updateFields.isActive = data.isActive;
         }
 
-        // Check if variants changed - only include changed variants with IDs
+        // Check if variants changed - match by ID, not by array index
+        // This is critical because new variants are prepended to the array,
+        // so index-based matching would corrupt data
         const changedVariants = data.variants
-          .map((v, i) => {
-            const original = originalData.variants[i];
+          .map((v) => {
+            // Find original by ID - this is the correct way to match variants
+            const original = v.id
+              ? originalData.variants.find((o) => o.id === v.id)
+              : null;
 
-            // Handle new variants (no id in originalData)
-            if (!original) {
-              // This is a new variant - include it in the payload
+            // Handle new variants (no id) - create new
+            if (!v.id) {
               return {
                 sku: v.sku,
                 price: v.price,
@@ -333,6 +342,17 @@ export default function EditProductPage() {
               };
             }
 
+            // Existing variant but not found in originalData - treat as new (shouldn't happen)
+            if (!original) {
+              return {
+                sku: v.sku,
+                price: v.price,
+                stock: v.stock,
+                attributes: v.attributes || [],
+              };
+            }
+
+            // Check if any fields changed
             const hasChanged =
               v.sku !== original.sku ||
               v.price !== original.price ||
@@ -340,16 +360,15 @@ export default function EditProductPage() {
 
             if (!hasChanged) return null;
 
-            // Build variant payload - include id if available
-            const variantPayload: Record<string, unknown> = {};
-            if (original.id) variantPayload.id = original.id;
-            variantPayload.sku = v.sku;
-            variantPayload.price = v.price;
-            variantPayload.stock = v.stock;
-
-            return variantPayload;
+            // Build variant payload with ONLY changed fields
+            const updatePayload: Record<string, unknown> = { id: v.id };
+            if (v.sku !== original.sku) updatePayload.sku = v.sku;
+            if (v.price !== original.price) updatePayload.price = v.price;
+            if (v.stock !== original.stock) updatePayload.stock = v.stock;
+            
+            return updatePayload;
           })
-          .filter(Boolean);
+          ?.filter(Boolean);
 
         if (changedVariants.length > 0) {
           updateFields.variants = changedVariants;
@@ -375,7 +394,7 @@ export default function EditProductPage() {
 
               return imagePayload;
             })
-            .filter(Boolean) || [];
+            ?.filter(Boolean) || [];
 
         if (currentImages.length > 0) {
           updateFields.images = currentImages;
@@ -624,7 +643,7 @@ export default function EditProductPage() {
               <div className="space-y-4">
                 {variants.map((variant, index) => (
                   <VariantCard
-                    key={index}
+                    key={variant.id ?? `new-${index}`}
                     index={index}
                     variant={variant}
                     backendVariant={
@@ -675,7 +694,7 @@ export default function EditProductPage() {
                 onUpload={(imgs) => setValue("images", imgs)}
                 onRemove={(idx) => {
                   const current = watch("images") || [];
-                  const filtered = current.filter((_, i) => i !== idx);
+                  const filtered = current?.filter((_, i) => i !== idx);
                   setValue(
                     "images",
                     filtered.map((img, i) => ({

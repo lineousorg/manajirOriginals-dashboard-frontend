@@ -48,7 +48,7 @@ const CategoriesPage = () => {
   const { toast } = useToast();
 
   // Filter categories based on search
-  const filteredCategories = categories.filter((category) =>
+  const filteredCategories = categories?.filter((category) =>
     category.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 

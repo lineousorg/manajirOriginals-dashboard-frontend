@@ -29,7 +29,7 @@ const GuestUsersPage = () => {
 
   const filteredGuestUsers = useMemo(() => {
     if (!Array.isArray(guestUsers)) return [];
-    return guestUsers.filter((user) => {
+    return guestUsers?.filter((user) => {
       const searchLower = searchQuery.toLowerCase();
       return (
         user.email.toLowerCase().includes(searchLower) ||

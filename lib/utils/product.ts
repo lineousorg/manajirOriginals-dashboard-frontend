@@ -11,7 +11,7 @@ export const transformVariantAttributes = (
       attributeId: attr.attributeValue?.attribute?.id ?? 0,
       valueId: attr.attributeValue?.id ?? 0,
     }))
-    .filter((a) => a.attributeId > 0 && a.valueId > 0);
+    ?.filter((a) => a.attributeId > 0 && a.valueId > 0);
 };
 
 // Convert file to base64

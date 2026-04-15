@@ -48,7 +48,7 @@ const CategoryTable = ({
   onToggleStatus,
 }: CategoryTableProps) => {
   // Get top-level categories (those without a parent)
-  const topLevelCategories = categories.filter((cat) => cat.parentId === null);
+  const topLevelCategories = categories?.filter((cat) => cat.parentId === null);
 
   // Helper to get full category data from the main array
   const getFullCategoryData = (id: number) => {

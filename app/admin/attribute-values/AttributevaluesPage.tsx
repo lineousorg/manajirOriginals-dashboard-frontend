@@ -90,7 +90,7 @@ const AttributeValuesPage = () => {
   const { toast } = useToast();
 
   // Filter attribute values based on search and attribute filter
-  const filteredValues = attributeValues.filter((av) => {
+  const filteredValues = attributeValues?.filter((av) => {
     const matchesSearch =
       av.value.toLowerCase().includes(searchQuery.toLowerCase()) ||
       av.attribute?.name.toLowerCase().includes(searchQuery.toLowerCase());

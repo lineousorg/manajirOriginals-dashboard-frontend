@@ -62,7 +62,7 @@ export default function DashboardPage() {
   // Calculate total orders this month
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
-  const ordersThisMonth = orders.filter(order => {
+  const ordersThisMonth = orders?.filter(order => {
     const orderDate = new Date(order.createdAt);
     return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
   }).length;

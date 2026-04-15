@@ -314,7 +314,7 @@ const OrdersPage = () => {
 
   const filteredOrders = useMemo(() => {
     if (!Array.isArray(orders)) return [];
-    return orders.filter((order) => {
+    return orders?.filter((order) => {
       const userEmail = order.user?.email || order.guestUser?.email || "";
       const matchesSearch =
         order.id.toString().includes(searchQuery.toLowerCase()) ||

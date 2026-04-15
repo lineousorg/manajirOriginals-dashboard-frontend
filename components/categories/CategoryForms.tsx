@@ -137,7 +137,7 @@ const CategoryForms = ({
 
   // Remove new image
   const removeImage = (index: number) => {
-    onNewImagesChange((prev) => prev.filter((_, i) => i !== index));
+    onNewImagesChange((prev) => prev?.filter((_, i) => i !== index));
   };
 
   // Handle edit image file selection
@@ -165,7 +165,7 @@ const CategoryForms = ({
 
   // Remove edit image
   const removeEditImage = (index: number) => {
-    onEditImagesChange((prev) => prev.filter((_, i) => i !== index));
+    onEditImagesChange((prev) => prev?.filter((_, i) => i !== index));
   };
 
   // Get category to delete
@@ -244,7 +244,7 @@ const CategoryForms = ({
                   None (Top-level category)
                 </option>
                 {categories
-                  .filter((cat) => cat.parentId === null)
+                  ?.filter((cat) => cat.parentId === null)
                   .map((cat) => (
                     <option key={cat.id} value={cat.id} className="text-sm">
                       {cat.name}

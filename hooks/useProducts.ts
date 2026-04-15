@@ -174,7 +174,7 @@ export const useProducts = () => {
       await productsApi.delete(id);
       // For soft delete, we filter out the product from the local state
       // The API now returns products without deleted ones
-      setProducts((prev) => prev.filter((p) => p.id !== id));
+      setProducts((prev) => prev?.filter((p) => p.id !== id));
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to delete product");
       throw err;
@@ -226,7 +226,7 @@ export const useProducts = () => {
           if (p.id === productId) {
             return {
               ...p,
-              variants: p.variants.filter((v) => v.id !== variantId),
+              variants: p.variants?.filter((v) => v.id !== variantId),
             };
           }
           return p;

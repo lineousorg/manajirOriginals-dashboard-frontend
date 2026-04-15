@@ -80,13 +80,13 @@ const AttributesPage = () => {
   const { toast } = useToast();
 
   // Filter attributes based on search
-  const filteredAttributes = attributes.filter((attribute) =>
+  const filteredAttributes = attributes?.filter((attribute) =>
     attribute.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Helper to get values for a specific attribute
   const getValuesForAttribute = (attributeId: number) => {
-    return attributeValues.filter((av) => av.attributeId === attributeId);
+    return attributeValues?.filter((av) => av.attributeId === attributeId);
   };
 
   const handleCreateAttribute = async () => {

@@ -186,9 +186,9 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <p className="text-center text-sm text-muted-foreground">
+          {/* <p className="text-center text-sm text-muted-foreground">
             Demo: Use any email & password (min 6 chars)
-          </p>
+          </p> */}
         </div>
       </motion.div>
     </div>

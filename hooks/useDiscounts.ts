@@ -76,7 +76,7 @@ export const useDiscounts = () => {
     setError(null);
     try {
       await discountsApi.delete(id);
-      setDiscounts((prev) => prev.filter((d) => d.id !== id));
+      setDiscounts((prev) => prev?.filter((d) => d.id !== id));
     } catch (err: any) {
       console.log(err);
       setError(err?.response?.data?.message);

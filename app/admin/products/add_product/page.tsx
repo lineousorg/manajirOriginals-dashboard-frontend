@@ -71,7 +71,7 @@ const generateSKU = (
     .toUpperCase()
     .replace(/[^A-Z\s-]/g, "")
     .split(/\s+/)
-    .filter(Boolean);
+    ?.filter(Boolean);
 
   if (words.length === 0) return "";
 
@@ -93,7 +93,7 @@ const generateSKU = (
   // Build SKU with attribute values
   const attrCodes = attributes
     .map((a) => attrValueMap[a.valueId] || "")
-    .filter(Boolean);
+    ?.filter(Boolean);
 
   // Format: NAME-ATTR1-ATTR2-VARIANTNUM (e.g., TSHIRT-RED-BLK-1)
   return `${nameSku}-${attrCodes.join("-")}-${variantIndex + 1}`.toUpperCase();
@@ -524,7 +524,7 @@ const CreateProductPage = () => {
                                     onValueChange={(val) => {
                                       const newAttrs = (
                                         attributeField.value || []
-                                      ).filter(
+                                      )?.filter(
                                         (a: { attributeId: number }) =>
                                           a.attributeId !== attr.id,
                                       );
@@ -542,7 +542,7 @@ const CreateProductPage = () => {
                                     </SelectTrigger>
                                     <SelectContent className="bg-white">
                                       {attributeValues
-                                        .filter((av) => av.attributeId === attr.id)
+                                        ?.filter((av) => av.attributeId === attr.id)
                                         .map((val) => (
                                           <SelectItem
                                             key={val.id}

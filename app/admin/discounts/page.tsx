@@ -135,7 +135,7 @@ const DiscountsPage = () => {
   };
 
   // Filter discounts based on search
-  const filteredDiscounts = discounts.filter((discount) =>
+  const filteredDiscounts = discounts?.filter((discount) =>
     discount.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (discount.code && discount.code.toLowerCase().includes(searchQuery.toLowerCase()))
   );
@@ -654,7 +654,7 @@ const DiscountsPage = () => {
                               } else {
                                 setFormData({
                                   ...formData,
-                                  variantIds: formData.variantIds.filter(
+                                  variantIds: formData.variantIds?.filter(
                                     (id) => id !== variant.id
                                   ),
                                 });

@@ -215,7 +215,7 @@ export default function VariantCard({
                 const formValues = watch(`variants.${index}.attributes`) || [];
                 const attrValue = formValues.find((a) => a.attributeId === attr.id);
                 const currentValueId = attrValue?.valueId || 0;
-                const filteredValues = attributeValues.filter((av) => av.attributeId === attr.id);
+                const filteredValues = attributeValues?.filter((av) => av.attributeId === attr.id);
 
                 // For existing variants (backendVariant.id exists), show read-only display
                 // Get the attribute value directly from backend data
@@ -250,7 +250,7 @@ export default function VariantCard({
                       value={currentValueId ? String(currentValueId) : ""}
                       onValueChange={(val) => {
                         const newVal = Number(val);
-                        const currentAttrs = (watch(`variants.${index}.attributes`) || []).filter((a) => a.attributeId !== attr.id);
+                        const currentAttrs = (watch(`variants.${index}.attributes`) || [])?.filter((a) => a.attributeId !== attr.id);
                         if (newVal > 0) {
                           currentAttrs.push({ attributeId: attr.id, valueId: newVal });
                         }
@@ -262,7 +262,7 @@ export default function VariantCard({
                           .toUpperCase()
                           .replace(/[^A-Z\s-]/g, "")
                           .split(/\s+/)
-                          .filter(Boolean)
+                          ?.filter(Boolean)
                           .map((word) => word[0])
                           .join("");
                         const attrValueMap: Record<number, string> = {};
@@ -271,7 +271,7 @@ export default function VariantCard({
                         });
                         const attrCodes = attrs
                           .map((a) => attrValueMap[a.valueId] || "")
-                          .filter(Boolean);
+                          ?.filter(Boolean);
                         const newSku = `${nameSku}-${attrCodes.join("-")}-${index + 1}`.toUpperCase();
                         setValue(`variants.${index}.sku`, newSku);
                       }}
@@ -306,11 +306,16 @@ export default function VariantCard({
                     : "This variant is hidden from customers"}
                 </p>
               </div>
-              <Switch
-                checked={backendVariant.isActive ?? true}
-                onCheckedChange={onToggleActive}
-                disabled={isToggling}
-              />
+              <div className="flex items-center gap-2">
+                {isToggling && (
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                )}
+                <Switch
+                  checked={backendVariant.isActive ?? true}
+                  onCheckedChange={onToggleActive}
+                  disabled={isToggling}
+                />
+              </div>
             </div>
           )}
         </div>

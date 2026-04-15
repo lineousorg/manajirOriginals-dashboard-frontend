@@ -30,7 +30,7 @@ const UsersPage = () => {
 
   const filteredUsers = useMemo(() => {
     if (!Array.isArray(users)) return [];
-    return users.filter((user) => {
+    return users?.filter((user) => {
       const searchLower = searchQuery.toLowerCase();
       return (
         user.email.toLowerCase().includes(searchLower) ||

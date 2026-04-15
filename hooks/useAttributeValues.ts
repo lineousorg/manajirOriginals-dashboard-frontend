@@ -133,7 +133,7 @@ export const useAttributeValues = (): UseAttributeValuesReturn => {
     setError(null);
     try {
       await attributeValuesApi.delete(id);
-      setAttributeValues((prev) => prev.filter((av) => av.id !== id));
+      setAttributeValues((prev) => prev?.filter((av) => av.id !== id));
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
       setError(error?.response?.data?.message || "Failed to delete attribute value");

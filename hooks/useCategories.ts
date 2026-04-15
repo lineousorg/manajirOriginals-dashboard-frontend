@@ -56,7 +56,7 @@ export const useCategories = () => {
     setError(null);
     try {
       await categoriesApi.delete(id);
-      setCategories((prev) => prev.filter((c) => c.id !== id));
+      setCategories((prev) => prev?.filter((c) => c.id !== id));
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to delete category");
       throw err;
