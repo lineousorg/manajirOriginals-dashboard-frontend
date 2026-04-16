@@ -7,7 +7,7 @@ import {
   FieldErrors,
   Control,
 } from "react-hook-form";
-import { Plus, Trash2, ChevronUp, ChevronDown, Loader2 } from "lucide-react";
+import { Plus, Trash2, ChevronUp, ChevronDown, Loader2, Tag, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -20,8 +20,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ProductFormData } from "@/lib/schemas/product";
 import { Attribute, AttributeValue } from "@/types/attribute";
+import { useState, useEffect } from "react";
 
 interface VariantCardProps {
   index: number;
@@ -39,6 +46,11 @@ interface VariantCardProps {
         attribute: { id: number; name: string };
       };
     }[];
+    // Discount fields from API
+    discountType?: string | null;
+    discountValue?: number | string | null;
+    discountStart?: string | null;
+    discountEnd?: string | null;
   };
   attributes: Attribute[];
   attributeValues: AttributeValue[];
@@ -75,6 +87,30 @@ export default function VariantCard({
   errors,
   productName = "",
 }: VariantCardProps) {
+  // Initialize discount values from backend variant data
+  useEffect(() => {
+    if (backendVariant?.id) {
+      // Set discount values from backend data if they exist
+      if (backendVariant.discountType !== undefined && backendVariant.discountType !== null) {
+        setValue(`variants.${index}.discountType`, backendVariant.discountType as "PERCENTAGE" | "FIXED");
+      }
+      if (backendVariant.discountValue !== undefined && backendVariant.discountValue !== null) {
+        setValue(`variants.${index}.discountValue`, Number(backendVariant.discountValue));
+      }
+      if (backendVariant.discountStart) {
+        // Convert to date format (YYYY-MM-DD)
+        const date = new Date(backendVariant.discountStart);
+        const formatted = date.toISOString().split('T')[0];
+        setValue(`variants.${index}.discountStart`, formatted);
+      }
+      if (backendVariant.discountEnd) {
+        const date = new Date(backendVariant.discountEnd);
+        const formatted = date.toISOString().split('T')[0];
+        setValue(`variants.${index}.discountEnd`, formatted);
+      }
+    }
+  }, [backendVariant, index, setValue]);
+
   return (
     <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
       {/* Header */}
@@ -318,8 +354,229 @@ export default function VariantCard({
               </div>
             </div>
           )}
+
+          {/* Discount Section */}
+          <DiscountSection
+            index={index}
+            variant={variant}
+            register={register}
+            watch={watch}
+            setValue={setValue}
+            errors={errors}
+          />
         </div>
       )}
     </div>
+  );
+}
+
+// Discount Section Component
+interface DiscountSectionProps {
+  index: number;
+  variant: ProductFormData["variants"][0];
+  register: UseFormRegister<ProductFormData>;
+  watch: UseFormWatch<ProductFormData>;
+  setValue: UseFormSetValue<ProductFormData>;
+  errors: FieldErrors<ProductFormData>;
+}
+
+function DiscountSection({
+  index,
+  variant,
+  register,
+  watch,
+  setValue,
+  errors,
+}: DiscountSectionProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const discountType = watch(`variants.${index}.discountType`);
+  const discountValue = watch(`variants.${index}.discountValue`);
+  const price = watch(`variants.${index}.price`) || 0;
+
+  // Get today's date string for comparison (YYYY-MM-DD)
+  const today = new Date().toISOString().split('T')[0];
+
+  // Validate dates - show error for past dates
+  const discountStart = watch(`variants.${index}.discountStart`);
+  const discountEnd = watch(`variants.${index}.discountEnd`);
+
+  // Custom validation for past dates
+  useEffect(() => {
+    if (discountStart && discountStart < today) {
+      setValue(`variants.${index}.discountStart`, "");
+    }
+    if (discountEnd && discountEnd < today) {
+      setValue(`variants.${index}.discountEnd`, "");
+    }
+  }, [discountStart, discountEnd, today, index, setValue]);
+
+  // Calculate discounted price
+  const calculateDiscountedPrice = () => {
+    if (!discountType || !discountValue || discountValue <= 0) {
+      return null;
+    }
+    if (discountType === "PERCENTAGE") {
+      return Math.max(0, price - (price * discountValue) / 100);
+    } else if (discountType === "FIXED") {
+      return Math.max(0, price - discountValue);
+    }
+    return null;
+  };
+
+  const discountedPrice = calculateDiscountedPrice();
+  const hasDiscount = discountType && discountValue && discountValue > 0;
+
+  const clearDiscount = () => {
+    setValue(`variants.${index}.discountType`, null);
+    setValue(`variants.${index}.discountValue`, null);
+    setValue(`variants.${index}.discountStart`, null);
+    setValue(`variants.${index}.discountEnd`, null);
+  };
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="mt-4">
+      <CollapsibleTrigger asChild>
+        <div className="flex items-center justify-between py-2 cursor-pointer hover:bg-muted/50 rounded px-2 -mx-2">
+          <div className="flex items-center gap-2">
+            <Tag className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Discount (Optional)</span>
+            {hasDiscount && (
+              <Badge variant="secondary" className="text-xs">
+                Active
+              </Badge>
+            )}
+          </div>
+          {isOpen ? (
+            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          )}
+        </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-4 pt-2">
+        {/* Discount Type */}
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground">Type</Label>
+          <RadioGroup
+            value={discountType || ""}
+            onValueChange={(val) => {
+              setValue(`variants.${index}.discountType`, val as "PERCENTAGE" | "FIXED");
+              if (!watch(`variants.${index}.discountValue`)) {
+                setValue(`variants.${index}.discountValue`, 0);
+              }
+            }}
+            className="flex gap-4"
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="PERCENTAGE" id={`percentage-${index}`} />
+              <Label htmlFor={`percentage-${index}`} className="text-sm cursor-pointer">
+                Percentage (% off)
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="FIXED" id={`fixed-${index}`} />
+              <Label htmlFor={`fixed-${index}`} className="text-sm cursor-pointer">
+                Fixed (BDT off)
+              </Label>
+            </div>
+          </RadioGroup>
+        </div>
+
+        {/* Discount Value */}
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground">
+            Value {discountType === "PERCENTAGE" ? "(%) " : "(BDT) "}
+            {discountType === "PERCENTAGE" && "(max 100)"}
+          </Label>
+          <Input
+            type="number"
+            step={discountType === "PERCENTAGE" ? "1" : "1"}
+            min={0}
+            max={discountType === "PERCENTAGE" ? 100 : undefined}
+            placeholder={discountType === "PERCENTAGE" ? "20" : "300"}
+            {...register(`variants.${index}.discountValue`, {
+              valueAsNumber: true,
+            })}
+            className={errors.variants?.[index]?.discountValue ? "border-destructive" : ""}
+          />
+          {errors.variants?.[index]?.discountValue && (
+            <p className="text-xs text-destructive">
+              {errors.variants[index]?.discountValue?.message}
+            </p>
+          )}
+        </div>
+
+        {/* Date Range */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Start Date</Label>
+            <Input
+              type="date"
+              min={new Date().toISOString().split('T')[0]}
+              {...register(`variants.${index}.discountStart`)}
+              className={errors.variants?.[index]?.discountStart ? "border-destructive" : "text-sm"}
+            />
+            {errors.variants?.[index]?.discountStart && (
+              <p className="text-xs text-destructive">
+                {errors.variants[index]?.discountStart?.message}
+              </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">End Date</Label>
+            <Input
+              type="date"
+              min={new Date().toISOString().split('T')[0]}
+              {...register(`variants.${index}.discountEnd`)}
+              className={errors.variants?.[index]?.discountEnd ? "border-destructive" : "text-sm"}
+            />
+            {errors.variants?.[index]?.discountEnd && (
+              <p className="text-xs text-destructive">
+                {errors.variants[index]?.discountEnd?.message}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Preview */}
+        {hasDiscount && discountedPrice !== null && (
+          <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+            <p className="text-xs text-muted-foreground">Preview</p>
+            <div className="flex items-center gap-2">
+              <span className="text-sm line-through text-muted-foreground">
+                ৳{price}
+              </span>
+              <span className="text-sm font-semibold text-green-600">
+                ৳{discountedPrice.toFixed(0)}
+              </span>
+              {discountType === "PERCENTAGE" && (
+                <Badge variant="secondary" className="text-xs">
+                  {discountValue}% off
+                </Badge>
+              )}
+              {discountType === "FIXED" && (
+                <Badge variant="secondary" className="text-xs">
+                  ৳{discountValue} off
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Clear Button */}
+        {hasDiscount && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={clearDiscount}
+            className="text-destructive hover:text-destructive"
+          >
+            <X className="w-4 h-4 mr-1" />
+            Remove Discount
+          </Button>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

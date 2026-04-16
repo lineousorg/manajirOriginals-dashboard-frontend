@@ -40,11 +40,24 @@ const imageSchema = z.object({
 });
 
 // Variant schema matching backend structure
+const today = new Date().toISOString().split('T')[0];
+
 const variantSchema = z.object({
   sku: z.string().min(1, "SKU is required"),
   price: z.number().min(0, "Price must be positive"),
   stock: z.number().min(0, "Stock must be positive"),
   attributes: z.array(attributeSchema).optional().default([]),
+  // Discount fields
+  discountType: z.enum(["PERCENTAGE", "FIXED"]).optional().nullable(),
+  discountValue: z.number().min(0).max(100).optional().nullable(),
+  discountStart: z.string().refine(
+    (val) => !val || val >= today,
+    { message: "Can't select past day" }
+  ).optional().nullable(),
+  discountEnd: z.string().refine(
+    (val) => !val || val >= today,
+    { message: "Can't select past day" }
+  ).optional().nullable(),
 });
 
 // Product schema matching backend structure
@@ -121,7 +134,16 @@ const CreateProductPage = () => {
       description: "",
       slug: "",
       categoryId: 0,
-      variants: [{ sku: "", price: 0, stock: 0, attributes: [] }],
+      variants: [{ 
+        sku: "", 
+        price: 0, 
+        stock: 0, 
+        attributes: [],
+        discountType: null,
+        discountValue: null,
+        discountStart: null,
+        discountEnd: null,
+      }],
       images: [],
     },
   });
@@ -225,6 +247,13 @@ const CreateProductPage = () => {
           price: v.price,
           stock: v.stock,
           attributes: v.attributes || [],
+          // Include discount fields if they exist
+          ...(v.discountType && v.discountValue !== null && v.discountValue !== undefined && {
+            discountType: v.discountType,
+            discountValue: v.discountValue,
+            discountStart: v.discountStart || undefined,
+            discountEnd: v.discountEnd || undefined,
+          }),
         })),
         images: data.images.map((img, index) => ({
           url: img.url,
@@ -475,7 +504,16 @@ const CreateProductPage = () => {
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    append({ sku: "", price: 0, stock: 0, attributes: [] })
+                    append({ 
+                      sku: "", 
+                      price: 0, 
+                      stock: 0, 
+                      attributes: [],
+                      discountType: null,
+                      discountValue: null,
+                      discountStart: null,
+                      discountEnd: null,
+                    })
                   }
                 >
                   <Plus className="w-4 h-4 mr-2" />

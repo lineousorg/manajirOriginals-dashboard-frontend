@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// Get today's date string in YYYY-MM-DD format
+const today = new Date().toISOString().split('T')[0];
+
 // Schema for form validation
 export const productSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
@@ -18,6 +21,17 @@ export const productSchema = z.object({
           valueId: z.number(),
         })
       ),
+      // Discount fields (optional)
+      discountType: z.enum(["PERCENTAGE", "FIXED"]).optional().nullable(),
+      discountValue: z.number().min(0, "Discount value must be positive").max(100, "Percentage cannot exceed 100").optional().nullable(),
+      discountStart: z.string().refine(
+        (val) => !val || val >= today,
+        { message: "Can't select past day" }
+      ).optional().nullable(),
+      discountEnd: z.string().refine(
+        (val) => !val || val >= today,
+        { message: "Can't select past day" }
+      ).optional().nullable(),
     })
   ).min(1, "At least one variant is required"),
   images: z.array(
@@ -37,6 +51,10 @@ export const INITIAL_VARIANT = {
   price: 0,
   stock: 0,
   attributes: [],
+  discountType: null,
+  discountValue: null,
+  discountStart: null,
+  discountEnd: null,
 } as const;
 
 export const INITIAL_FORM = {

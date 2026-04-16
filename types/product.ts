@@ -39,6 +39,11 @@ export interface ProductVariant {
   deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  // Discount fields
+  discountType?: "PERCENTAGE" | "FIXED" | null;
+  discountValue?: number | null;
+  discountStart?: string | null;
+  discountEnd?: string | null;
 }
 
 // Main Product interface (matches API response)
@@ -82,6 +87,11 @@ export interface CreateVariantInput {
   stock: number;
   attributes?: VariantAttributeForm[];
   isActive?: boolean;
+  // Discount fields
+  discountType?: "PERCENTAGE" | "FIXED" | null;
+  discountValue?: number | null;
+  discountStart?: string | null;
+  discountEnd?: string | null;
 }
 
 export interface UpdateVariantInput {
@@ -91,6 +101,11 @@ export interface UpdateVariantInput {
   stock: number;
   attributes?: VariantAttributeForm[];
   isActive?: boolean;
+  // Discount fields
+  discountType?: "PERCENTAGE" | "FIXED" | null;
+  discountValue?: number | null;
+  discountStart?: string | null;
+  discountEnd?: string | null;
 }
 
 export interface UpdateProductInput extends Partial<CreateProductInput> {

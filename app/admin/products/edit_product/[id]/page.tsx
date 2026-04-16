@@ -96,7 +96,16 @@ export default function EditProductPage() {
     description: string;
     categoryId: number;
     isActive: boolean;
-    variants: Array<{ id?: number; sku: string; price: number; stock: number }>;
+    variants: Array<{
+      id?: number;
+      sku: string;
+      price: number;
+      stock: number;
+      discountType?: "PERCENTAGE" | "FIXED" | null;
+      discountValue?: number | null;
+      discountStart?: string | null;
+      discountEnd?: string | null;
+    }>;
     images: Array<{
       id?: number;
       url: string;
@@ -155,6 +164,10 @@ export default function EditProductPage() {
           price: Number(v.price) || 0,
           stock: v.stock,
           attributes: transformVariantAttributes(v),
+          discountType: v.discountType ?? null,
+          discountValue: v.discountValue ?? null,
+          discountStart: v.discountStart ?? null,
+          discountEnd: v.discountEnd ?? null,
         })),
         images: product.images || [],
       });
@@ -169,6 +182,10 @@ export default function EditProductPage() {
           sku: v.sku || "",
           price: Number(v.price) || 0,
           stock: v.stock,
+          discountType: v.discountType ?? null,
+          discountValue: v.discountValue ?? null,
+          discountStart: v.discountStart ?? null,
+          discountEnd: v.discountEnd ?? null,
         })),
         images:
           product.images
@@ -243,6 +260,10 @@ export default function EditProductPage() {
               price: Number(v.price) || 0,
               stock: v.stock,
               attributes: transformVariantAttributes(v),
+              discountType: v.discountType ?? null,
+              discountValue: v.discountValue ?? null,
+              discountStart: v.discountStart ?? null,
+              discountEnd: v.discountEnd ?? null,
             })),
             images: updated.images || [],
           });
@@ -258,6 +279,10 @@ export default function EditProductPage() {
               sku: v.sku,
               price: Number(v.price) || 0,
               stock: v.stock,
+              discountType: v.discountType ?? null,
+              discountValue: v.discountValue ?? null,
+              discountStart: v.discountStart ?? null,
+              discountEnd: v.discountEnd ?? null,
             })),
             images:
               updated.images
@@ -325,7 +350,17 @@ export default function EditProductPage() {
         // Check if variants changed - match by ID, not by array index
         // This is critical because new variants are prepended to the array,
         // so index-based matching would corrupt data
-        const changedVariants = data.variants
+        const changedVariants = (data.variants as unknown as Array<{
+          id?: number;
+          sku: string;
+          price: number;
+          stock: number;
+          discountType?: "PERCENTAGE" | "FIXED" | null;
+          discountValue?: number | null;
+          discountStart?: string | null;
+          discountEnd?: string | null;
+          attributes?: Array<{ attributeId: number; valueId: number }>;
+        }>)
           .map((v) => {
             // Find original by ID - this is the correct way to match variants
             const original = v.id
@@ -339,6 +374,13 @@ export default function EditProductPage() {
                 price: v.price,
                 stock: v.stock,
                 attributes: v.attributes || [],
+                // Include discount fields for new variants
+                ...(v.discountType && v.discountValue !== null && v.discountValue !== undefined && {
+                  discountType: v.discountType,
+                  discountValue: v.discountValue,
+                  discountStart: v.discountStart || undefined,
+                  discountEnd: v.discountEnd || undefined,
+                }),
               };
             }
 
@@ -349,14 +391,24 @@ export default function EditProductPage() {
                 price: v.price,
                 stock: v.stock,
                 attributes: v.attributes || [],
+                ...(v.discountType && v.discountValue !== null && v.discountValue !== undefined && {
+                  discountType: v.discountType,
+                  discountValue: v.discountValue,
+                  discountStart: v.discountStart || undefined,
+                  discountEnd: v.discountEnd || undefined,
+                }),
               };
             }
 
-            // Check if any fields changed
+            // Check if any fields changed (including discount fields)
             const hasChanged =
               v.sku !== original.sku ||
               v.price !== original.price ||
-              v.stock !== original.stock;
+              v.stock !== original.stock ||
+              v.discountType !== original.discountType ||
+              v.discountValue !== original.discountValue ||
+              v.discountStart !== original.discountStart ||
+              v.discountEnd !== original.discountEnd;
 
             if (!hasChanged) return null;
 
@@ -365,6 +417,20 @@ export default function EditProductPage() {
             if (v.sku !== original.sku) updatePayload.sku = v.sku;
             if (v.price !== original.price) updatePayload.price = v.price;
             if (v.stock !== original.stock) updatePayload.stock = v.stock;
+            
+            // Discount fields - include if changed or if discount is being set
+            if (v.discountType !== original.discountType) {
+              updatePayload.discountType = v.discountType;
+            }
+            if (v.discountValue !== original.discountValue) {
+              updatePayload.discountValue = v.discountValue;
+            }
+            if (v.discountStart !== original.discountStart) {
+              updatePayload.discountStart = v.discountStart;
+            }
+            if (v.discountEnd !== original.discountEnd) {
+              updatePayload.discountEnd = v.discountEnd;
+            }
             
             return updatePayload;
           })
@@ -441,8 +507,17 @@ export default function EditProductPage() {
       current.length + 1, // Use length + 1 for unique SKU
     );
 
-    // Add new variant at the top - completely empty
-    const newVariant = { sku: newSku, price: 0, stock: 0, attributes: [] };
+    // Add new variant at the top - completely empty (with discount fields)
+    const newVariant = { 
+      sku: newSku, 
+      price: 0, 
+      stock: 0, 
+      attributes: [],
+      discountType: null,
+      discountValue: null,
+      discountStart: null,
+      discountEnd: null,
+    };
     const newVariants = [newVariant, ...current];
 
     // Set the new variants array
@@ -454,6 +529,10 @@ export default function EditProductPage() {
     setValue(`variants.0.price`, 0, { shouldValidate: false });
     setValue(`variants.0.stock`, 0, { shouldValidate: false });
     setValue(`variants.0.attributes`, [], { shouldValidate: false });
+    setValue(`variants.0.discountType`, null, { shouldValidate: false });
+    setValue(`variants.0.discountValue`, null, { shouldValidate: false });
+    setValue(`variants.0.discountStart`, null, { shouldValidate: false });
+    setValue(`variants.0.discountEnd`, null, { shouldValidate: false });
 
     // Auto-expand the new variant (index 0)
     setExpandedIndex(0);
