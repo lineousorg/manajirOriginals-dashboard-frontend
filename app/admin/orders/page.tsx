@@ -189,6 +189,26 @@ const OrderDetailsModal = ({
               </div>
             )}
 
+            {/* Guest User Address */}
+            {!order.user && order.guestUser && order.guestUser.address && (
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                  <MapPin className="w-4 h-4" />
+                  <span className="text-sm font-medium">Shipping Address</span>
+                </div>
+                <div className="space-y-1 font-medium">
+                  <p className="text-sm text">
+                    {order.guestUser.address}, {order.guestUser.city}
+                  </p>
+                  {order.guestUser.postalCode && (
+                    <p className="text-sm text-muted-foreground">
+                      {order.guestUser.postalCode}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Status */}
             <div className="p-4 rounded-lg bg-muted/50">
               <div className="flex items-center gap-2 text-muted-foreground mb-2">
