@@ -61,7 +61,7 @@ export const AdminSidebar = () => {
                 <ShoppingBag className="w-4 h-4 text-accent-foreground" />
               </div>
               <span className="font-semibold text-lg text-sidebar-foreground">
-                Commerce
+                Commerces
               </span>
             </motion.div>
           ) : (
