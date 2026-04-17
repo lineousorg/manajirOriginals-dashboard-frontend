@@ -145,6 +145,7 @@ const UsersPage = () => {
                               </span>
                             </div>
                             <div>
+                              
                               <p className="font-medium">{user.email}</p>
                               <p className="text-sm text-muted-foreground">
                                 ID: {user.id}
