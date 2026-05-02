@@ -129,7 +129,7 @@ const OrderDetailsModal = ({
       onClose={onClose}
       title={`Order #${isLoading ? 'Loading...' : order?.orderNumber || 'Loading...'}`}
       description="View order details and items"
-      size="xl"
+      size="full"
     >
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
@@ -366,14 +366,15 @@ const OrdersPage = () => {
   }, [orders]);
 
   const handleStatusChange = async (
-    orderId: number,
+    order: Order,
     newStatus: OrderStatus,
   ) => {
     try {
-      await updateOrderStatus(orderId, { status: newStatus });
+      await updateOrderStatus(order.id, { status: newStatus });
+  
       toast({
         title: "Order status updated",
-        description: `Order #${orderId} status has been updated to ${orderStatusLabels[newStatus]}.`,
+        description: `Order #${order.orderNumber ?? order.id} status has been updated to ${orderStatusLabels[newStatus]}.`,
       });
     } catch (error) {
       toast({
@@ -661,7 +662,7 @@ const OrdersPage = () => {
                           <Select
                             value={order.status}
                             onValueChange={(value) =>
-                              handleStatusChange(order.id, value as OrderStatus)
+                              handleStatusChange(order, value as OrderStatus)
                             }
                           >
                             <SelectTrigger className="w-32 h-8">
