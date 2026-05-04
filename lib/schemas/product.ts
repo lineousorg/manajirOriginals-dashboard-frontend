@@ -23,7 +23,7 @@ export const productSchema = z.object({
       ),
       // Discount fields (optional)
       discountType: z.enum(["PERCENTAGE", "FIXED"]).optional().nullable(),
-      discountValue: z.number().min(0, "Discount value must be positive").max(100, "Percentage cannot exceed 100").optional().nullable(),
+      discountValue: z.number().min(0, "Discount value must be positive").optional().nullable(),
       discountStart: z.string().refine(
         (val) => !val || val >= today,
         { message: "Can't select past day" }
@@ -32,6 +32,15 @@ export const productSchema = z.object({
         (val) => !val || val >= today,
         { message: "Can't select past day" }
       ).optional().nullable(),
+    }).superRefine((data, ctx) => {
+      // Conditional validation: only enforce max 100 for percentage discounts
+      if (data.discountType === "PERCENTAGE" && data.discountValue !== null && data.discountValue !== undefined && data.discountValue > 100) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Percentage cannot exceed 100",
+          path: ["discountValue"],
+        });
+      }
     })
   ).min(1, "At least one variant is required"),
   images: z.array(
