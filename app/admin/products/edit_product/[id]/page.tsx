@@ -26,6 +26,7 @@ import {
 import { transformVariantAttributes } from "@/lib/utils/product";
 import VariantCard from "@/components/product/VariantCard";
 import ProductImageGallery from "@/components/product/ProductImageGallery";
+import RichTextEditor from "@/components/editor/RichTextEditor";
 
 // Helper function to generate SKU based on product name and variant attributes
 const generateSKU = (
@@ -94,6 +95,7 @@ export default function EditProductPage() {
   const [originalData, setOriginalData] = useState<{
     name: string;
     description: string;
+    productDetailsHtml?: string;
     categoryId: number;
     isActive: boolean;
     variants: Array<{
@@ -156,6 +158,7 @@ export default function EditProductPage() {
       reset({
         name: product.name,
         description: product.description,
+        productDetailsHtml: product.productDetailsHtml || "",
         categoryId: product.categoryId ?? product.category?.id, // Fix: Use nested category.id if categoryId is undefined
         isActive: product.isActive,
         variants: activeVariants.map((v) => ({
@@ -175,6 +178,7 @@ export default function EditProductPage() {
       setOriginalData({
         name: product.name,
         description: product.description,
+        productDetailsHtml: product.productDetailsHtml,
         categoryId: product.categoryId ?? product.category?.id, // Fix: Use nested category.id if categoryId is undefined
         isActive: product.isActive,
         variants: activeVariants.map((v) => ({
@@ -245,55 +249,57 @@ export default function EditProductPage() {
           const updated = await productsApi.getById(id);
           setProduct(updated);
 
-          // Reset form with updated product data
-          const updatedActiveVariants = updated.variants?.filter(
-            (v) => !v.isDeleted,
-          );
-          reset({
-            name: updated.name,
-            description: updated.description,
-            categoryId: updated.categoryId ?? updated.category?.id,
-            isActive: updated.isActive,
-            variants: updatedActiveVariants.map((v) => ({
-              id: v.id,
-              sku: v.sku || "",
-              price: Number(v.price) || 0,
-              stock: v.stock,
-              attributes: transformVariantAttributes(v),
-              discountType: v.discountType ?? null,
-              discountValue: v.discountValue ?? null,
-              discountStart: v.discountStart ?? null,
-              discountEnd: v.discountEnd ?? null,
-            })),
-            images: updated.images || [],
-          });
+           // Reset form with updated product data
+           const updatedActiveVariants = updated.variants?.filter(
+             (v) => !v.isDeleted,
+           );
+           reset({
+             name: updated.name,
+             description: updated.description,
+             productDetailsHtml: updated.productDetailsHtml || "",
+             categoryId: updated.categoryId ?? updated.category?.id,
+             isActive: updated.isActive,
+             variants: updatedActiveVariants.map((v) => ({
+               id: v.id,
+               sku: v.sku || "",
+               price: Number(v.price) || 0,
+               stock: v.stock,
+               attributes: transformVariantAttributes(v),
+               discountType: v.discountType ?? null,
+               discountValue: v.discountValue ?? null,
+               discountStart: v.discountStart ?? null,
+               discountEnd: v.discountEnd ?? null,
+             })),
+             images: updated.images || [],
+           });
 
-          // Update original data
-          setOriginalData({
-            name: updated.name,
-            description: updated.description,
-            categoryId: updated.categoryId ?? updated.category?.id,
-            isActive: updated.isActive,
-            variants: updatedActiveVariants.map((v) => ({
-              id: v.id,
-              sku: v.sku,
-              price: Number(v.price) || 0,
-              stock: v.stock,
-              discountType: v.discountType ?? null,
-              discountValue: v.discountValue ?? null,
-              discountStart: v.discountStart ?? null,
-              discountEnd: v.discountEnd ?? null,
-            })),
-            images:
-              updated.images
-                ?.filter((img) => img.url?.trim())
-                .map((img, index) => ({
-                  id: img.id,
-                  url: img.url,
-                  altText: img.altText || "",
-                  position: index,
-                })) || [],
-          });
+           // Update original data
+           setOriginalData({
+             name: updated.name,
+             description: updated.description,
+             productDetailsHtml: updated.productDetailsHtml,
+             categoryId: updated.categoryId ?? updated.category?.id,
+             isActive: updated.isActive,
+             variants: updatedActiveVariants.map((v) => ({
+               id: v.id,
+               sku: v.sku,
+               price: Number(v.price) || 0,
+               stock: v.stock,
+               discountType: v.discountType ?? null,
+               discountValue: v.discountValue ?? null,
+               discountStart: v.discountStart ?? null,
+               discountEnd: v.discountEnd ?? null,
+             })),
+             images:
+               updated.images
+                 ?.filter((img) => img.url?.trim())
+                 .map((img, index) => ({
+                   id: img.id,
+                   url: img.url,
+                   altText: img.altText || "",
+                   position: index,
+                 })) || [],
+           });
 
           toast({
             title: "Variant deleted",
@@ -335,6 +341,11 @@ export default function EditProductPage() {
         // Check if description changed
         if (data.description !== originalData.description) {
           updateFields.description = data.description;
+        }
+
+        // Check if productDetailsHtml changed
+        if (data.productDetailsHtml !== originalData.productDetailsHtml) {
+          updateFields.productDetailsHtml = data.productDetailsHtml;
         }
 
         // Check if category changed
@@ -645,20 +656,32 @@ export default function EditProductPage() {
                   )}
                 </div>
                 <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="productDetailsHtml">Product Details</Label>
+                  <RichTextEditor
+                    value={watch("productDetailsHtml") || ""}
+                    onChange={(value) => setValue("productDetailsHtml", value)}
+                  />
+                  {errors.productDetailsHtml && (
+                    <p className="text-sm text-destructive">
+                      {errors.productDetailsHtml.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2 md:col-span-2">
                   <Label>Category</Label>
                   {/* DEBUG: Log categories and product.categoryId in render */}
                   <div
                     dangerouslySetInnerHTML={{
                       __html: (function () {
-                        console.log("RENDER - categories:", categories);
-                        console.log(
-                          "RENDER - effective categoryId:",
-                          product?.categoryId ?? product?.category?.id,
-                          "product.categoryId:",
-                          product?.categoryId,
-                          "product.category.id:",
-                          product?.category?.id,
-                        );
+                        // console.log("RENDER - categories:", categories);
+                        // console.log(
+                        //   "RENDER - effective categoryId:",
+                        //   product?.categoryId ?? product?.category?.id,
+                        //   "product.categoryId:",
+                        //   product?.categoryId,
+                        //   "product.category.id:",
+                        //   product?.category?.id,
+                        // );
                         return "";
                       })(),
                     }}

@@ -7,6 +7,7 @@ const today = new Date().toISOString().split('T')[0];
 export const productSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   description: z.string().min(1, "Description is required").max(500),
+  productDetailsHtml: z.string().optional(),
   categoryId: z.number().min(1, "Category is required"),
   isActive: z.boolean().optional(),
   variants: z.array(
@@ -69,6 +70,7 @@ export const INITIAL_VARIANT = {
 export const INITIAL_FORM = {
   name: "",
   description: "",
+  productDetailsHtml: "",
   categoryId: 0,
   isActive: true,
   variants: [INITIAL_VARIANT],

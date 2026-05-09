@@ -25,6 +25,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { CreateProductInput, ProductImage } from "@/types/product";
+import RichTextEditor from "@/components/editor/RichTextEditor";
 
 // Variant attribute schema
 const attributeSchema = z.object({
@@ -73,6 +74,7 @@ const variantSchema = z.object({
 const productSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   description: z.string().min(1, "Description is required").max(500),
+  productDetailsHtml: z.string().optional(),
   slug: z.string().min(1, "Slug is required").max(100),
   categoryId: z.number().min(1, "Category is required"),
   variants: z.array(variantSchema).min(1, "At least one variant is required"),
@@ -141,6 +143,7 @@ const CreateProductPage = () => {
     defaultValues: {
       name: "",
       description: "",
+      productDetailsHtml: "",
       slug: "",
       categoryId: 0,
       variants: [{ 
@@ -249,6 +252,7 @@ const CreateProductPage = () => {
       const productData: CreateProductInput = {
         name: data.name,
         description: data.description,
+        productDetailsHtml: data.productDetailsHtml || undefined,
         slug: data.slug,
         categoryId: data.categoryId,
         variants: data.variants.map((v) => ({
@@ -420,6 +424,20 @@ const CreateProductPage = () => {
                   {errors.description && (
                     <p className="text-sm text-destructive">
                       {errors.description.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Product Details HTML */}
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="productDetailsHtml">Product Details</Label>
+                  <RichTextEditor
+                    value={watch("productDetailsHtml") || ""}
+                    onChange={(value) => setValue("productDetailsHtml", value)}
+                  />
+                  {errors.productDetailsHtml && (
+                    <p className="text-sm text-destructive">
+                      {errors.productDetailsHtml.message}
                     </p>
                   )}
                 </div>
