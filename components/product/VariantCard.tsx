@@ -25,10 +25,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ProductFormData } from "@/lib/schemas/product";
 import { Attribute, AttributeValue } from "@/types/attribute";
 import { useState, useEffect } from "react";
+import { generateSKU } from "@/lib/utils/product";
 
 interface VariantCardProps {
   index: number;
@@ -185,18 +187,24 @@ export default function VariantCard({
             {/* SKU */}
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">SKU</Label>
-              <Input
-                placeholder="SKU-123"
-                {...register(`variants.${index}.sku`)}
-                className={
-                  errors.variants?.[index]?.sku ? "border-destructive" : ""
-                }
-              />
-              {errors.variants?.[index]?.sku && (
-                <p className="text-xs text-destructive">
-                  {errors.variants[index]?.sku?.message}
-                </p>
-              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Input
+                    placeholder="SKU-123"
+                    {...register(`variants.${index}.sku`)}
+                    disabled
+                    className={
+                      errors.variants?.[index]?.sku ? "border-destructive" : ""
+                    }
+                  />
+                </TooltipTrigger>
+                <TooltipContent className="bg-white">
+                  <p>SKU is auto generated</p>
+                  <p className="text-muted-foreground text-xs mt-1">
+                    Formula: <code className="text-foreground">{`{ProductNameAbbreviation}-{AttributeValueCode1}-{AttributeValueCode2}-...-{VariantIndex}`}</code>
+                  </p>
+                </TooltipContent>
+              </Tooltip>
             </div>
 
             {/* Price */}
@@ -256,14 +264,14 @@ export default function VariantCard({
                 // For existing variants (backendVariant.id exists), show read-only display
                 // Get the attribute value directly from backend data
                 const isExistingVariant = !!backendVariant?.id;
-                
+
                 if (isExistingVariant) {
                   // Get attribute value from backend data
                   const backendAttr = backendVariant?.attributes?.find(
                     (a) => a.attributeValue?.attribute?.id === attr.id
                   );
                   const backendValue = backendAttr?.attributeValue?.value || "N/A";
-                  
+
                   return (
                     <div key={attr.id} className="space-y-1">
                       <span className="text-xs font-medium text-muted-foreground block">
@@ -293,22 +301,13 @@ export default function VariantCard({
                         setValue(`variants.${index}.attributes`, currentAttrs);
 
                         // Auto-generate SKU when attributes change
-                        const attrs = watch(`variants.${index}.attributes`) || [];
-                        const nameSku = productName
-                          .toUpperCase()
-                          .replace(/[^A-Z\s-]/g, "")
-                          .split(/\s+/)
-                          ?.filter(Boolean)
-                          .map((word) => word[0])
-                          .join("");
-                        const attrValueMap: Record<number, string> = {};
-                        attributeValues.forEach((av) => {
-                          attrValueMap[av.id] = av.value.substring(0, 3).toUpperCase();
-                        });
-                        const attrCodes = attrs
-                          .map((a) => attrValueMap[a.valueId] || "")
-                          ?.filter(Boolean);
-                        const newSku = `${nameSku}-${attrCodes.join("-")}-${index + 1}`.toUpperCase();
+                        // Use currentAttrs directly to avoid race condition with stale watch
+                        const newSku = generateSKU(
+                          productName,
+                          currentAttrs,
+                          attributeValues,
+                          index
+                        );
                         setValue(`variants.${index}.sku`, newSku);
                       }}
                     >
@@ -327,6 +326,13 @@ export default function VariantCard({
                 );
               })}
             </div>
+            {/* Duplicate variant error */}
+            {errors.variants?.[index]?.attributes && (
+              <p className="text-xs text-destructive flex items-center gap-1 mt-2">
+                <X className="w-3 h-3" />
+                {errors.variants[index]?.attributes?.message}
+              </p>
+            )}
           </div>
 
           {/* Status Toggle */}

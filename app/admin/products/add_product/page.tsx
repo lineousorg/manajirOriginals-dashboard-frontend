@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import { Plus, Trash2, ArrowLeft, Loader2 } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Loader2, X } from "lucide-react";
 import { useProducts } from "@/hooks/useProducts";
 import { useCategories } from "@/hooks/useCategories";
 import { useAttributes } from "@/hooks/useAttributes";
@@ -26,6 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { CreateProductInput, ProductImage } from "@/types/product";
 import RichTextEditor from "@/components/editor/RichTextEditor";
+import { generateSKU } from "@/lib/utils/product";
 
 // Variant attribute schema
 const attributeSchema = z.object({
@@ -77,51 +78,47 @@ const productSchema = z.object({
   productDetailsHtml: z.string().optional(),
   slug: z.string().min(1, "Slug is required").max(100),
   categoryId: z.number().min(1, "Category is required"),
-  variants: z.array(variantSchema).min(1, "At least one variant is required"),
+  variants: z.array(variantSchema).min(1, "At least one variant is required").superRefine((variants, ctx) => {
+    // Check for duplicate variants based on attributes
+    const attributeSignatureMap = new Map<string, number[]>();
+
+    variants.forEach((variant, index) => {
+      // Create a unique signature for the variant's attributes
+      // Sort by attributeId to ensure consistent ordering
+      const sortedAttrs = [...(variant.attributes || [])].sort(
+        (a, b) => a.attributeId - b.attributeId
+      );
+      const signature = sortedAttrs
+        .map((attr) => `${attr.attributeId}:${attr.valueId}`)
+        .join(";");
+
+      if (!signature) return; // Skip variants with no attributes
+
+      if (attributeSignatureMap.has(signature)) {
+        attributeSignatureMap.get(signature)!.push(index);
+      } else {
+        attributeSignatureMap.set(signature, [index]);
+      }
+    });
+
+    // Add errors for duplicate variants
+    attributeSignatureMap.forEach((indices) => {
+      if (indices.length > 1) {
+        // All indices except the first one are considered duplicates
+        indices.slice(1).forEach((dupIndex) => {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "That variant already exists. Cannot create the same variant twice.",
+            path: [dupIndex, "attributes"],
+          });
+        });
+      }
+    });
+  }),
   images: z.array(imageSchema).optional().default([]),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
-
-// Helper function to generate SKU based on product name and variant attributes
-const generateSKU = (
-  productName: string,
-  attributes: Array<{ attributeId: number; valueId: number }>,
-  attributeValues: Array<{ id: number; value: string; attributeId: number }>,
-  variantIndex: number,
-): string => {
-  // Convert product name to uppercase without spaces, limit to first 5 characters
-  const words = productName
-    .toUpperCase()
-    .replace(/[^A-Z\s-]/g, "")
-    .split(/\s+/)
-    ?.filter(Boolean);
-
-  if (words.length === 0) return "";
-
-  const initials = words.map((word) => word[0]).join("");
-
-  const lastWordConsonants = words[words.length - 1]
-    .slice(1)
-    .replace(/[AEIOU]/g, "");
-
-  const nameSku = initials + lastWordConsonants;
-
-  // Get attribute values from the actual data
-  const attrValueMap: Record<number, string> = {};
-  attributeValues.forEach((av) => {
-    // Get first 3 characters of value, uppercase
-    attrValueMap[av.id] = av.value.substring(0, 3).toUpperCase();
-  });
-
-  // Build SKU with attribute values
-  const attrCodes = attributes
-    .map((a) => attrValueMap[a.valueId] || "")
-    ?.filter(Boolean);
-
-  // Format: NAME-ATTR1-ATTR2-VARIANTNUM (e.g., TSHIRT-RED-BLK-1)
-  return `${nameSku}-${attrCodes.join("-")}-${variantIndex + 1}`.toUpperCase();
-};
 
 const CreateProductPage = () => {
   const router = useRouter();
@@ -625,6 +622,14 @@ const CreateProductPage = () => {
                         ))}
                       </div>
                     </div>
+
+                    {/* Duplicate variant error */}
+                    {errors.variants?.[index]?.attributes && (
+                      <p className="text-sm text-destructive flex items-center gap-1 mb-4">
+                        <X className="w-4 h-4" />
+                        {errors.variants[index]?.attributes?.message}
+                      </p>
+                    )}
 
                     <div className="flex gap-4 justify-between border-t pt-4">
                       <div className="space-y-2">

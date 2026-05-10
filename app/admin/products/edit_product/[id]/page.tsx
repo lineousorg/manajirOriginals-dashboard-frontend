@@ -23,50 +23,10 @@ import {
   ProductFormData,
   INITIAL_FORM,
 } from "@/lib/schemas/product";
-import { transformVariantAttributes } from "@/lib/utils/product";
+import { transformVariantAttributes, generateSKU } from "@/lib/utils/product";
 import VariantCard from "@/components/product/VariantCard";
 import ProductImageGallery from "@/components/product/ProductImageGallery";
 import RichTextEditor from "@/components/editor/RichTextEditor";
-
-// Helper function to generate SKU based on product name and variant attributes
-const generateSKU = (
-  productName: string,
-  attributes: Array<{ attributeId: number; valueId: number }>,
-  attributeValues: Array<{ id: number; value: string; attributeId: number }>,
-  variantIndex: number,
-): string => {
-  // Convert product name to uppercase without spaces, limit to first 5 characters
-  const words = productName
-    .toUpperCase()
-    .replace(/[^A-Z\s-]/g, "")
-    .split(/\s+/)
-    ?.filter(Boolean);
-
-  if (words.length === 0) return "";
-
-  const initials = words.map((word) => word[0]).join("");
-
-  const lastWordConsonants = words[words.length - 1]
-    .slice(1)
-    .replace(/[AEIOU]/g, "");
-
-  const nameSku = initials + lastWordConsonants;
-
-  // Get attribute values from the actual data
-  const attrValueMap: Record<number, string> = {};
-  attributeValues.forEach((av) => {
-    // Get first 3 characters of value, uppercase
-    attrValueMap[av.id] = av.value.substring(0, 3).toUpperCase();
-  });
-
-  // Build SKU with attribute values
-  const attrCodes = attributes
-    .map((a) => attrValueMap[a.valueId] || "")
-    ?.filter(Boolean);
-
-  // Format: NAME-ATTR1-ATTR2-VARIANTNUM (e.g., TSHIRT-RED-BLK-1)
-  return `${nameSku}-${attrCodes.join("-")}-${variantIndex + 1}`.toUpperCase();
-};
 
 export default function EditProductPage() {
   const params = useParams<{ id: string }>();
@@ -510,12 +470,13 @@ export default function EditProductPage() {
     const current = watch("variants") || [];
     const productName = watch("name") || "";
 
-    // Generate a completely empty SKU for the new variant
+    // New variant will be prepended at index 0
+    // Generate SKU with index 0 (will be regenerated when attributes are selected)
     const newSku = generateSKU(
       productName,
       [], // No attributes selected yet
       attributeValues,
-      current.length + 1, // Use length + 1 for unique SKU
+      0, // Index will be 0 after prepending
     );
 
     // Add new variant at the top - completely empty (with discount fields)
@@ -535,7 +496,6 @@ export default function EditProductPage() {
     setValue("variants", newVariants, { shouldValidate: false });
 
     // Explicitly reset each field for the new variant to prevent cached data
-    // Use resetField to completely clear any cached values
     setValue(`variants.0.sku`, newSku, { shouldValidate: false });
     setValue(`variants.0.price`, 0, { shouldValidate: false });
     setValue(`variants.0.stock`, 0, { shouldValidate: false });
