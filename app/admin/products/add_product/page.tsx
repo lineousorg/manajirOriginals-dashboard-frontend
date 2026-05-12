@@ -129,14 +129,15 @@ const CreateProductPage = () => {
   const { attributeValues, isLoading: isLoadingAttributeValues } = useAttributeValues();
   const { toast } = useToast();
 
-  const {
-    register,
-    control,
-    handleSubmit,
-    watch,
-    setValue,
-    formState: { errors, isSubmitting },
-  } = useForm<ProductFormData>({
+   const {
+     register,
+     control,
+     handleSubmit,
+     watch,
+     setValue,
+     setError,
+     formState: { errors, isSubmitting },
+   } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: {
       name: "",

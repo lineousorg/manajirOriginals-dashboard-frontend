@@ -117,15 +117,16 @@ export default function EditProductPage() {
   // Filter active variants once - used throughout the component
   const activeVariants = product?.variants?.filter((v) => !v.isDeleted) || [];
 
-  const {
-    register,
-    control,
-    handleSubmit,
-    reset,
-    watch,
-    setValue,
-    formState: { errors, isSubmitting },
-  } = useForm<ProductFormData>({
+   const {
+     register,
+     control,
+     handleSubmit,
+     reset,
+     watch,
+     setValue,
+     setError,
+     formState: { errors, isSubmitting },
+   } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: INITIAL_FORM as unknown as ProductFormData,
   });
@@ -719,44 +720,46 @@ export default function EditProductPage() {
                 </p>
               )}
 
-              <div className="space-y-4">
-                {variants.map((variant, index) => (
-                  <VariantCard
-                    key={variant.id ?? `new-${index}`}
-                    index={index}
-                    variant={variant}
-                    backendVariant={
-                      variant.id
-                        ? activeVariants.find((av) => av.id === variant.id)
-                        : undefined
-                    }
-                    attributes={attributes}
-                    attributeValues={attributeValues}
-                    isExpanded={expandedIndex === index}
-                    onToggleExpand={() =>
-                      setExpandedIndex(expandedIndex === index ? null : index)
-                    }
-                    onRemove={() => handleVariantRemove(index)}
-                    onToggleActive={
-                      variant.id
-                        ? () => handleToggleVariantActive(Number(variant?.id))
-                        : undefined
-                    }
-                    isToggling={
-                      variant.id ? togglingVariantId === variant.id : false
-                    }
-                    isDeleting={
-                      variant.id ? deletingVariantId === variant.id : false
-                    }
-                    register={register}
-                    control={control}
-                    watch={watch}
-                    setValue={setValue}
-                    errors={errors}
-                    productName={watch("name")}
-                  />
-                ))}
-              </div>
+               <div className="space-y-4">
+                 {variants.map((variant, index) => (
+                   <VariantCard
+                     key={variant.id ?? `new-${index}`}
+                     index={index}
+                     variant={variant}
+                     backendVariant={
+                       variant.id
+                         ? activeVariants.find((av) => av.id === variant.id)
+                         : undefined
+                     }
+                     attributes={attributes}
+                     attributeValues={attributeValues}
+                     isExpanded={expandedIndex === index}
+                     onToggleExpand={() =>
+                       setExpandedIndex(expandedIndex === index ? null : index)
+                     }
+                     onRemove={() => handleVariantRemove(index)}
+                     onToggleActive={
+                       variant.id
+                         ? () => handleToggleVariantActive(Number(variant?.id))
+                         : undefined
+                     }
+                     isToggling={
+                       variant.id ? togglingVariantId === variant.id : false
+                     }
+                     isDeleting={
+                       variant.id ? deletingVariantId === variant.id : false
+                     }
+                     register={register}
+                     control={control}
+                     watch={watch}
+                     setValue={setValue}
+                     setError={setError}
+                     errors={errors}
+                     productName={watch("name")}
+                     toast={toast}
+                   />
+                 ))}
+               </div>
             </div>
           </FadeIn>
 
