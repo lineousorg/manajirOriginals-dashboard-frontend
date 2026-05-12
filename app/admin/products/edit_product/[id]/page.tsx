@@ -23,49 +23,10 @@ import {
   ProductFormData,
   INITIAL_FORM,
 } from "@/lib/schemas/product";
-import { transformVariantAttributes } from "@/lib/utils/product";
+import { transformVariantAttributes, generateSKU } from "@/lib/utils/product";
 import VariantCard from "@/components/product/VariantCard";
 import ProductImageGallery from "@/components/product/ProductImageGallery";
-
-// Helper function to generate SKU based on product name and variant attributes
-const generateSKU = (
-  productName: string,
-  attributes: Array<{ attributeId: number; valueId: number }>,
-  attributeValues: Array<{ id: number; value: string; attributeId: number }>,
-  variantIndex: number,
-): string => {
-  // Convert product name to uppercase without spaces, limit to first 5 characters
-  const words = productName
-    .toUpperCase()
-    .replace(/[^A-Z\s-]/g, "")
-    .split(/\s+/)
-    ?.filter(Boolean);
-
-  if (words.length === 0) return "";
-
-  const initials = words.map((word) => word[0]).join("");
-
-  const lastWordConsonants = words[words.length - 1]
-    .slice(1)
-    .replace(/[AEIOU]/g, "");
-
-  const nameSku = initials + lastWordConsonants;
-
-  // Get attribute values from the actual data
-  const attrValueMap: Record<number, string> = {};
-  attributeValues.forEach((av) => {
-    // Get first 3 characters of value, uppercase
-    attrValueMap[av.id] = av.value.substring(0, 3).toUpperCase();
-  });
-
-  // Build SKU with attribute values
-  const attrCodes = attributes
-    .map((a) => attrValueMap[a.valueId] || "")
-    ?.filter(Boolean);
-
-  // Format: NAME-ATTR1-ATTR2-VARIANTNUM (e.g., TSHIRT-RED-BLK-1)
-  return `${nameSku}-${attrCodes.join("-")}-${variantIndex + 1}`.toUpperCase();
-};
+import RichTextEditor from "@/components/editor/RichTextEditor";
 
 export default function EditProductPage() {
   const params = useParams<{ id: string }>();
@@ -94,6 +55,7 @@ export default function EditProductPage() {
   const [originalData, setOriginalData] = useState<{
     name: string;
     description: string;
+    productDetailsHtml?: string;
     categoryId: number;
     isActive: boolean;
     variants: Array<{
@@ -157,6 +119,7 @@ export default function EditProductPage() {
       reset({
         name: product.name,
         description: product.description,
+        productDetailsHtml: product.productDetailsHtml || "",
         categoryId: product.categoryId ?? product.category?.id, // Fix: Use nested category.id if categoryId is undefined
         isActive: product.isActive,
         variants: activeVariants.map((v) => ({
@@ -176,6 +139,7 @@ export default function EditProductPage() {
       setOriginalData({
         name: product.name,
         description: product.description,
+        productDetailsHtml: product.productDetailsHtml,
         categoryId: product.categoryId ?? product.category?.id, // Fix: Use nested category.id if categoryId is undefined
         isActive: product.isActive,
         variants: activeVariants.map((v) => ({
@@ -246,55 +210,57 @@ export default function EditProductPage() {
           const updated = await productsApi.getById(id);
           setProduct(updated);
 
-          // Reset form with updated product data
-          const updatedActiveVariants = updated.variants?.filter(
-            (v) => !v.isDeleted,
-          );
-          reset({
-            name: updated.name,
-            description: updated.description,
-            categoryId: updated.categoryId ?? updated.category?.id,
-            isActive: updated.isActive,
-            variants: updatedActiveVariants.map((v) => ({
-              id: v.id,
-              sku: v.sku || "",
-              price: Number(v.price) || 0,
-              stock: v.stock,
-              attributes: transformVariantAttributes(v),
-              discountType: v.discountType ?? null,
-              discountValue: v.discountValue ?? null,
-              discountStart: v.discountStart ?? null,
-              discountEnd: v.discountEnd ?? null,
-            })),
-            images: updated.images || [],
-          });
+           // Reset form with updated product data
+           const updatedActiveVariants = updated.variants?.filter(
+             (v) => !v.isDeleted,
+           );
+           reset({
+             name: updated.name,
+             description: updated.description,
+             productDetailsHtml: updated.productDetailsHtml || "",
+             categoryId: updated.categoryId ?? updated.category?.id,
+             isActive: updated.isActive,
+             variants: updatedActiveVariants.map((v) => ({
+               id: v.id,
+               sku: v.sku || "",
+               price: Number(v.price) || 0,
+               stock: v.stock,
+               attributes: transformVariantAttributes(v),
+               discountType: v.discountType ?? null,
+               discountValue: v.discountValue ?? null,
+               discountStart: v.discountStart ?? null,
+               discountEnd: v.discountEnd ?? null,
+             })),
+             images: updated.images || [],
+           });
 
-          // Update original data
-          setOriginalData({
-            name: updated.name,
-            description: updated.description,
-            categoryId: updated.categoryId ?? updated.category?.id,
-            isActive: updated.isActive,
-            variants: updatedActiveVariants.map((v) => ({
-              id: v.id,
-              sku: v.sku,
-              price: Number(v.price) || 0,
-              stock: v.stock,
-              discountType: v.discountType ?? null,
-              discountValue: v.discountValue ?? null,
-              discountStart: v.discountStart ?? null,
-              discountEnd: v.discountEnd ?? null,
-            })),
-            images:
-              updated.images
-                ?.filter((img) => img.url?.trim())
-                .map((img, index) => ({
-                  id: img.id,
-                  url: img.url,
-                  altText: img.altText || "",
-                  position: index,
-                })) || [],
-          });
+           // Update original data
+           setOriginalData({
+             name: updated.name,
+             description: updated.description,
+             productDetailsHtml: updated.productDetailsHtml,
+             categoryId: updated.categoryId ?? updated.category?.id,
+             isActive: updated.isActive,
+             variants: updatedActiveVariants.map((v) => ({
+               id: v.id,
+               sku: v.sku,
+               price: Number(v.price) || 0,
+               stock: v.stock,
+               discountType: v.discountType ?? null,
+               discountValue: v.discountValue ?? null,
+               discountStart: v.discountStart ?? null,
+               discountEnd: v.discountEnd ?? null,
+             })),
+             images:
+               updated.images
+                 ?.filter((img) => img.url?.trim())
+                 .map((img, index) => ({
+                   id: img.id,
+                   url: img.url,
+                   altText: img.altText || "",
+                   position: index,
+                 })) || [],
+           });
 
           toast({
             title: "Variant deleted",
@@ -336,6 +302,11 @@ export default function EditProductPage() {
         // Check if description changed
         if (data.description !== originalData.description) {
           updateFields.description = data.description;
+        }
+
+        // Check if productDetailsHtml changed
+        if (data.productDetailsHtml !== originalData.productDetailsHtml) {
+          updateFields.productDetailsHtml = data.productDetailsHtml;
         }
 
         // Check if category changed
@@ -500,12 +471,13 @@ export default function EditProductPage() {
     const current = watch("variants") || [];
     const productName = watch("name") || "";
 
-    // Generate a completely empty SKU for the new variant
+    // New variant will be prepended at index 0
+    // Generate SKU with index 0 (will be regenerated when attributes are selected)
     const newSku = generateSKU(
       productName,
       [], // No attributes selected yet
       attributeValues,
-      current.length + 1, // Use length + 1 for unique SKU
+      0, // Index will be 0 after prepending
     );
 
     // Add new variant at the top - completely empty (with discount fields)
@@ -525,7 +497,6 @@ export default function EditProductPage() {
     setValue("variants", newVariants, { shouldValidate: false });
 
     // Explicitly reset each field for the new variant to prevent cached data
-    // Use resetField to completely clear any cached values
     setValue(`variants.0.sku`, newSku, { shouldValidate: false });
     setValue(`variants.0.price`, 0, { shouldValidate: false });
     setValue(`variants.0.stock`, 0, { shouldValidate: false });
@@ -646,20 +617,32 @@ export default function EditProductPage() {
                   )}
                 </div>
                 <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="productDetailsHtml">Product Details</Label>
+                  <RichTextEditor
+                    value={watch("productDetailsHtml") || ""}
+                    onChange={(value) => setValue("productDetailsHtml", value)}
+                  />
+                  {errors.productDetailsHtml && (
+                    <p className="text-sm text-destructive">
+                      {errors.productDetailsHtml.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2 md:col-span-2">
                   <Label>Category</Label>
                   {/* DEBUG: Log categories and product.categoryId in render */}
                   <div
                     dangerouslySetInnerHTML={{
                       __html: (function () {
-                        console.log("RENDER - categories:", categories);
-                        console.log(
-                          "RENDER - effective categoryId:",
-                          product?.categoryId ?? product?.category?.id,
-                          "product.categoryId:",
-                          product?.categoryId,
-                          "product.category.id:",
-                          product?.category?.id,
-                        );
+                        // console.log("RENDER - categories:", categories);
+                        // console.log(
+                        //   "RENDER - effective categoryId:",
+                        //   product?.categoryId ?? product?.category?.id,
+                        //   "product.categoryId:",
+                        //   product?.categoryId,
+                        //   "product.category.id:",
+                        //   product?.category?.id,
+                        // );
                         return "";
                       })(),
                     }}
