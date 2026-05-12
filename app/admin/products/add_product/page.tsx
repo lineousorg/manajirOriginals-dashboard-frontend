@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useFieldArray, useForm, Controller, useWatch } from "react-hook-form";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
@@ -27,6 +27,7 @@ import { useRouter } from "next/navigation";
 import { CreateProductInput, ProductImage } from "@/types/product";
 import RichTextEditor from "@/components/editor/RichTextEditor";
 import { generateSKU } from "@/lib/utils/product";
+import { uploadToCloudinary } from "@/lib/utils/cloudinary";
 
 // Variant attribute schema
 const attributeSchema = z.object({
@@ -180,17 +181,10 @@ const CreateProductPage = () => {
     name: "images",
   });
 
-  // Convert file to base64
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
-  };
+  // Track upload progress for each image
+  const [uploadingImages, setUploadingImages] = useState<Record<number, boolean>>({});
 
-  // Handle image file selection
+  // Handle image file selection - upload to Cloudinary
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -199,17 +193,39 @@ const CreateProductPage = () => {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      const imageIndex = currentImages.length + i;
+      
       try {
-        const base64 = await fileToBase64(file);
+        // Set uploading state
+        setUploadingImages(prev => ({ ...prev, [imageIndex]: true }));
+        
+        // Upload to Cloudinary
+        const cloudinaryUrl = await uploadToCloudinary(file);
+        
         appendImage({
-          url: base64,
+          url: cloudinaryUrl,
           altText: file.name,
-          position: currentImages.length + i,
+          position: imageIndex,
         });
       } catch (error) {
-        console.error("Error converting file to base64:", error);
+        console.error("Error uploading image to Cloudinary:", error);
+        toast({
+          title: "Upload Failed",
+          description: `Failed to upload ${file.name}. Please try again.`,
+          variant: "destructive",
+        });
+      } finally {
+        // Clear uploading state
+        setUploadingImages(prev => {
+          const newState = { ...prev };
+          delete newState[imageIndex];
+          return newState;
+        });
       }
     }
+    
+    // Reset the input
+    e.target.value = "";
   };
 
   // Store previous SKU values to prevent infinite loop
@@ -478,26 +494,34 @@ const CreateProductPage = () => {
                           className="relative group"
                         >
                           <div className="aspect-square bg-muted rounded-lg overflow-hidden border">
-                            <img
-                              src={watch(`images.${index}.url`)}
-                              alt={
-                                watch(`images.${index}.altText`) ||
-                                `Product image ${index + 1}`
-                              }
-                              className="w-full h-full object-cover"
-                            />
+                            {uploadingImages[index] ? (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                              </div>
+                            ) : (
+                              <img
+                                src={watch(`images.${index}.url`)}
+                                alt={
+                                  watch(`images.${index}.altText`) ||
+                                  `Product image ${index + 1}`
+                                }
+                                className="w-full h-full object-cover"
+                              />
+                            )}
                           </div>
                           <div className="mt-2 space-y-2">
                             <Input
                               placeholder="Alt text (optional)"
                               {...register(`images.${index}.altText`)}
                               className="text-xs"
+                              disabled={uploadingImages[index]}
                             />
                             <Button
                               type="button"
                               variant="ghost"
                               size="sm"
                               onClick={() => removeImage(index)}
+                              disabled={uploadingImages[index]}
                               className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
                             >
                               <Trash2 className="w-4 h-4 mr-2" />

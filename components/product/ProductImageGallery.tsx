@@ -1,12 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ProductImage } from "@/types/product";
-import { fileToBase64 } from "@/lib/utils/product";
+import { uploadToCloudinary } from "@/lib/utils/cloudinary";
 
 interface ProductImageGalleryProps {
   images: ProductImage[];
@@ -19,21 +20,38 @@ export default function ProductImageGallery({
   onUpload,
   onRemove,
 }: ProductImageGalleryProps) {
+  const [uploadingIndices, setUploadingIndices] = useState<Set<number>>(new Set());
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files?.length) return;
 
     const newImages: ProductImage[] = [];
     for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const imageIndex = images.length + i;
+      
       try {
-        const base64 = await fileToBase64(files[i]);
+        // Mark as uploading
+        setUploadingIndices(prev => new Set(prev).add(imageIndex));
+        
+        // Upload to Cloudinary
+        const cloudinaryUrl = await uploadToCloudinary(file);
+        
         newImages.push({
-          url: base64,
-          altText: files[i].name,
-          position: images.length + i,
+          url: cloudinaryUrl,
+          altText: file.name,
+          position: imageIndex,
         });
       } catch {
-        // Silent fail
+        // Silent fail - could add toast notification here
+      } finally {
+        // Remove from uploading set
+        setUploadingIndices(prev => {
+          const next = new Set(prev);
+          next.delete(imageIndex);
+          return next;
+        });
       }
     }
 
@@ -77,11 +95,17 @@ export default function ProductImageGallery({
             className="relative group"
           >
             <div className="aspect-square bg-muted rounded-lg overflow-hidden border">
-              <img
-                src={img.url}
-                alt={img.altText || `Product image ${index + 1}`}
-                className="w-full h-full object-cover"
-              />
+              {uploadingIndices.has(index) ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <img
+                  src={img.url}
+                  alt={img.altText || `Product image ${index + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              )}
             </div>
             <div className="mt-2 space-y-2">
               <Input
@@ -93,12 +117,14 @@ export default function ProductImageGallery({
                   onUpload(updated);
                 }}
                 className="text-xs"
+                disabled={uploadingIndices.has(index)}
               />
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={() => onRemove(index)}
+                disabled={uploadingIndices.has(index)}
                 className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
