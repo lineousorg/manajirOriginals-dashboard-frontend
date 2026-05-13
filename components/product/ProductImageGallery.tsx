@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -11,13 +11,15 @@ import { fileToBase64 } from "@/lib/utils/product";
 interface ProductImageGalleryProps {
   images: ProductImage[];
   onUpload: (images: ProductImage[]) => void;
-  onRemove: (index: number) => void;
+  onRemove: (index: number, imageId?: number) => void;
+  deletingImageId?: number | null;
 }
 
 export default function ProductImageGallery({
   images,
   onUpload,
   onRemove,
+  deletingImageId,
 }: ProductImageGalleryProps) {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -98,11 +100,16 @@ export default function ProductImageGallery({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => onRemove(index)}
+                onClick={() => onRemove(index, img.id)}
+                disabled={deletingImageId === img.id}
                 className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
               >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Remove
+                {deletingImageId === img.id ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4 mr-2" />
+                )}
+                {deletingImageId === img.id ? "Removing..." : "Remove"}
               </Button>
             </div>
           </motion.div>

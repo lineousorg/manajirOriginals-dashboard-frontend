@@ -50,6 +50,7 @@ export default function EditProductPage() {
   const [deletingVariantId, setDeletingVariantId] = useState<number | null>(
     null,
   );
+  const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
   const [initialized, setInitialized] = useState(false);
   const [originalData, setOriginalData] = useState<{
@@ -281,6 +282,99 @@ export default function EditProductPage() {
           const updated = current?.filter((_, i) => i !== index);
           setValue("variants", updated);
         }
+      }
+    },
+    [id, watch, setValue, setProduct, toast, reset, setOriginalData],
+  );
+
+  const handleImageRemove = useCallback(
+    async (index: number, imageId?: number) => {
+       console.log("clickied");
+      // If image has an ID, it exists in the backend - delete it
+      if (imageId) {
+        setDeletingImageId(imageId);
+        try {
+          await productsApi.deleteImage(id, imageId);
+          const updated = await productsApi.getById(id);
+          setProduct(updated);
+
+          // Reset form with updated product data
+          const updatedActiveVariants = updated.variants?.filter(
+            (v) => !v.isDeleted,
+          );
+          reset({
+            name: updated.name,
+            description: updated.description,
+            productDetailsHtml: updated.productDetailsHtml || "",
+            categoryId: updated.categoryId ?? updated.category?.id,
+            isActive: updated.isActive,
+            variants: updatedActiveVariants.map((v) => ({
+              id: v.id,
+              sku: v.sku || "",
+              price: Number(v.price) || 0,
+              stock: v.stock,
+              attributes: transformVariantAttributes(v),
+              discountType: v.discountType ?? null,
+              discountValue: v.discountValue ?? null,
+              discountStart: v.discountStart ?? null,
+              discountEnd: v.discountEnd ?? null,
+            })),
+            images: updated.images || [],
+          });
+
+          // Update original data
+          setOriginalData({
+            name: updated.name,
+            description: updated.description,
+            productDetailsHtml: updated.productDetailsHtml,
+            categoryId: updated.categoryId ?? updated.category?.id,
+            isActive: updated.isActive,
+            variants: updatedActiveVariants.map((v) => ({
+              id: v.id,
+              sku: v.sku,
+              price: Number(v.price) || 0,
+              stock: v.stock,
+              discountType: v.discountType ?? null,
+              discountValue: v.discountValue ?? null,
+              discountStart: v.discountStart ?? null,
+              discountEnd: v.discountEnd ?? null,
+            })),
+            images:
+              updated.images
+                ?.filter((img) => img.url?.trim())
+                .map((img, idx) => ({
+                  id: img.id,
+                  url: img.url,
+                  altText: img.altText || "",
+                  position: idx,
+                })) || [],
+          });
+
+          toast({
+            title: "Image deleted",
+            description: "The image has been removed from the product.",
+          });
+        } catch {
+          toast({
+            title: "Error",
+            description: "Failed to delete image.",
+            variant: "destructive",
+          });
+        } finally {
+          setDeletingImageId(null);
+        }
+      } else {
+        // New image (not saved yet) - just remove from local form state
+        const current = watch("images") || [];
+        const filtered = current?.filter((_, i) => i !== index);
+        setValue(
+          "images",
+          filtered.map((img, i) => ({
+            url: img.url,
+            altText: img.altText || "",
+            position: i,
+          })),
+        );
       }
     },
     [id, watch, setValue, setProduct, toast, reset, setOriginalData],
@@ -747,31 +841,22 @@ export default function EditProductPage() {
           </FadeIn>
 
           {/* Images */}
-          <FadeIn delay={0.3}>
-            <div className="bg-card rounded-lg border p-6 shadow-card">
-              <ProductImageGallery
-                images={(watch("images") || []).map((img, idx) => ({
-                  url: img.url,
-                  altText: img.altText || "",
-                  position:
-                    typeof img.position === "number" ? img.position : idx,
-                }))}
-                onUpload={(imgs) => setValue("images", imgs)}
-                onRemove={(idx) => {
-                  const current = watch("images") || [];
-                  const filtered = current?.filter((_, i) => i !== idx);
-                  setValue(
-                    "images",
-                    filtered.map((img, i) => ({
-                      url: img.url,
-                      altText: img.altText || "",
-                      position: i,
-                    })),
-                  );
-                }}
-              />
-            </div>
-          </FadeIn>
+           <FadeIn delay={0.3}>
+             <div className="bg-card rounded-lg border p-6 shadow-card">
+               <ProductImageGallery
+                 images={(watch("images") || []).map((img, idx) => ({
+                   id: img.id,
+                   url: img.url,
+                   altText: img.altText || "",
+                   position:
+                     typeof img.position === "number" ? img.position : idx,
+                 }))}
+                 onUpload={(imgs) => setValue("images", imgs)}
+                 onRemove={handleImageRemove}
+                 deletingImageId={deletingImageId}
+               />
+             </div>
+           </FadeIn>
 
           {/* Actions */}
           <FadeIn delay={0.4} className="flex gap-4 justify-end">

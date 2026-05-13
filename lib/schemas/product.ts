@@ -46,6 +46,7 @@ export const productSchema = z.object({
   ).min(1, "At least one variant is required"),
   images: z.array(
     z.object({
+      id: z.number().optional(),
       url: z.string().min(1, "Image URL is required"),
       altText: z.string().optional(),
       position: z.number(),
