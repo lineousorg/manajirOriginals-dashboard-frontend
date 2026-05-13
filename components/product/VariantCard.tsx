@@ -72,7 +72,7 @@ interface VariantCardProps {
   setError: UseFormSetError<ProductFormData>;
   errors: FieldErrors<ProductFormData>;
   productName?: string;
-  toast: (props: { title: string; description?: string; variant?: "default" | "destructive" | "success" }) => void;
+  toast: (props: { title: string; description?: string; variant?: "default" | "destructive" }) => void;
 }
 
 export default function VariantCard({
@@ -402,7 +402,7 @@ interface DiscountSectionProps {
   setValue: UseFormSetValue<ProductFormData>;
   setError: UseFormSetError<ProductFormData>;
   errors: FieldErrors<ProductFormData>;
-  toast: (props: { title: string; description?: string; variant?: "default" | "destructive" | "success" }) => void;
+  toast: (props: { title: string; description?: string; variant?: "default" | "destructive" }) => void;
 }
 
 function DiscountSection({
