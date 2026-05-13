@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useFieldArray, useForm, Controller, useWatch } from "react-hook-form";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
@@ -27,6 +27,7 @@ import { useRouter } from "next/navigation";
 import { CreateProductInput, ProductImage } from "@/types/product";
 import RichTextEditor from "@/components/editor/RichTextEditor";
 import { generateSKU } from "@/lib/utils/product";
+import { uploadToCloudinary } from "@/lib/utils/cloudinary";
 
 // Variant attribute schema
 const attributeSchema = z.object({
@@ -37,6 +38,7 @@ const attributeSchema = z.object({
 // Image schema
 const imageSchema = z.object({
   url: z.string().min(1, "Image URL is required"),
+  publicId: z.string().optional(), // Cloudinary public ID for deletion
   altText: z.string().optional().default(""),
   position: z.number(),
 });
@@ -180,36 +182,77 @@ const CreateProductPage = () => {
     name: "images",
   });
 
-  // Convert file to base64
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
-  };
+  // Track uploading images with local preview URLs
+  const [uploadingImages, setUploadingImages] = useState<Array<{
+    index: number;
+    localUrl: string;
+    fileName: string;
+  }>>([]);
 
-  // Handle image file selection
+  // Handle image file selection - upload to Cloudinary
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     const currentImages = watch("images") || [];
+    const newUploadingImages: Array<{
+      index: number;
+      localUrl: string;
+      fileName: string;
+    }> = [];
 
+    // Create local previews for all files immediately
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      const imageIndex = currentImages.length + i;
+      const localUrl = URL.createObjectURL(file);
+      
+      newUploadingImages.push({
+        index: imageIndex,
+        localUrl,
+        fileName: file.name,
+      });
+    }
+
+    // Add all to uploading state immediately (instant UI feedback)
+    setUploadingImages(prev => [...prev, ...newUploadingImages]);
+
+    // Upload each image
+    for (const upload of newUploadingImages) {
       try {
-        const base64 = await fileToBase64(file);
+        const file = files[upload.index - currentImages.length];
+        
+        // Upload to Cloudinary
+        const cloudinaryResponse = await uploadToCloudinary(file);
+        
+        // Add to form with publicId for Cloudinary deletion
         appendImage({
-          url: base64,
-          altText: file.name,
-          position: currentImages.length + i,
+          url: cloudinaryResponse.secure_url,
+          publicId: cloudinaryResponse.public_id,
+          altText: upload.fileName,
+          position: upload.index,
         });
+        
+        // Remove from uploading state
+        setUploadingImages(prev => prev.filter(u => u.index !== upload.index));
+        
+        // Clean up object URL
+        URL.revokeObjectURL(upload.localUrl);
       } catch (error) {
-        console.error("Error converting file to base64:", error);
+        console.error("Error uploading image to Cloudinary:", error);
+        toast({
+          title: "Upload Failed",
+          description: `Failed to upload ${upload.fileName}. Please try again.`,
+          variant: "destructive",
+        });
+        // Remove from uploading state (failed)
+        setUploadingImages(prev => prev.filter(u => u.index !== upload.index));
+        URL.revokeObjectURL(upload.localUrl);
       }
     }
+    
+    // Reset the input
+    e.target.value = "";
   };
 
   // Store previous SKU values to prevent infinite loop
@@ -268,12 +311,13 @@ const CreateProductPage = () => {
         })),
         images: data.images.map((img, index) => ({
           url: img.url,
+          publicId: img.publicId,
           altText: img.altText,
           position: index,
         })),
       };
 
-      console.log(productData);
+      // console.log(productData);
 
       // Create product and get the response with productId
       const createdProduct = await createProduct(productData);
@@ -470,42 +514,62 @@ const CreateProductPage = () => {
                     )}
 
                     <div className="grid gap-4 md:grid-cols-3">
-                      {imageFields.map((field, index) => (
-                        <motion.div
-                          key={field.id}
-                          initial={{ opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          className="relative group"
-                        >
-                          <div className="aspect-square bg-muted rounded-lg overflow-hidden border">
-                            <img
-                              src={watch(`images.${index}.url`)}
-                              alt={
-                                watch(`images.${index}.altText`) ||
-                                `Product image ${index + 1}`
-                              }
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div className="mt-2 space-y-2">
-                            <Input
-                              placeholder="Alt text (optional)"
-                              {...register(`images.${index}.altText`)}
-                              className="text-xs"
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeImage(index)}
-                              className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Remove
-                            </Button>
-                          </div>
-                        </motion.div>
-                      ))}
+                      {imageFields.map((field, index) => {
+                        const uploadingInfo = uploadingImages.find(u => u.index === index);
+                        const isUploading = !!uploadingInfo;
+                        
+                        return (
+                          <motion.div
+                            key={field.id}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="relative group"
+                          >
+                            <div className="aspect-square bg-muted rounded-lg overflow-hidden border">
+                              {isUploading ? (
+                                <div className="w-full h-full flex items-center justify-center relative">
+                                  <img
+                                    src={uploadingInfo!.localUrl}
+                                    alt={uploadingInfo!.fileName}
+                                    className="w-full h-full object-cover opacity-50"
+                                  />
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                                  </div>
+                                </div>
+                              ) : (
+                                <img
+                                  src={watch(`images.${index}.url`)}
+                                  alt={
+                                    watch(`images.${index}.altText`) ||
+                                    `Product image ${index + 1}`
+                                  }
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </div>
+                            <div className="mt-2 space-y-2">
+                              <Input
+                                placeholder="Alt text (optional)"
+                                {...register(`images.${index}.altText`)}
+                                className="text-xs"
+                                disabled={isUploading}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeImage(index)}
+                                disabled={isUploading}
+                                className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Remove
+                              </Button>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
                     </div>
 
                     {errors.images && (

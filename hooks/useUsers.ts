@@ -14,7 +14,7 @@ export const useUsers = () => {
     setError(null);
     try {
       const data = await usersApi.getAll();
-      console.log(data);
+      // console.log(data);
       setUsers(data);
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to fetch users");

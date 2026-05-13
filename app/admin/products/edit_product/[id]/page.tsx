@@ -23,6 +23,7 @@ import {
   ProductFormData,
   INITIAL_FORM,
 } from "@/lib/schemas/product";
+import { ProductImage } from "@/types/product";
 import { transformVariantAttributes, generateSKU } from "@/lib/utils/product";
 import VariantCard from "@/components/product/VariantCard";
 import ProductImageGallery from "@/components/product/ProductImageGallery";
@@ -382,6 +383,7 @@ export default function EditProductPage() {
 
   const onSubmit = useCallback(
     async (data: ProductFormData) => {
+      console.log(data);
       if (!id || !originalData) return;
 
       try {
@@ -506,30 +508,30 @@ export default function EditProductPage() {
           updateFields.variants = changedVariants;
         }
 
-        // Check if images changed
-        const currentImages =
-          data.images
-            ?.filter((img) => img.url?.trim())
-            ?.map((img, index) => {
-              const original = originalData.images[index];
-              const hasChanged =
-                img.url !== original?.url || img.altText !== original?.altText;
+        // Check if images changed - compare full normalized arrays
+        const normalizedOriginalImages = originalData.images.map((img, index) => ({
+          id: img.id,
+          url: img.url,
+          altText: img.altText || "",
+          position: index,
+        }));
 
-              if (!hasChanged && original?.id) return null;
+        const normalizedCurrentImages = (data.images || [])
+          .filter((img) => img.url?.trim())
+          .map((img, index) => ({
+            id: img.id,
+            url: img.url,
+            altText: img.altText || "",
+            position: index,
+          }));
 
-              // Build image payload - include id if available
-              const imagePayload: Record<string, unknown> = {};
-              if (original?.id) imagePayload.id = original.id;
-              imagePayload.url = img.url;
-              if (img.altText) imagePayload.altText = img.altText;
-              imagePayload.position = index;
+        const imagesChanged =
+          JSON.stringify(normalizedOriginalImages) !==
+          JSON.stringify(normalizedCurrentImages);
 
-              return imagePayload;
-            })
-            ?.filter(Boolean) || [];
-
-        if (currentImages.length > 0) {
-          updateFields.images = currentImages;
+        if (imagesChanged) {
+          // IMPORTANT: send FULL image array
+          updateFields.images = normalizedCurrentImages;
         }
 
         // Don't send request if nothing changed
@@ -541,7 +543,7 @@ export default function EditProductPage() {
           return;
         }
 
-        await productsApi.update(
+        const updatedProduct = await productsApi.update(
           id,
           updateFields as unknown as import("@/types/product").UpdateProductInput,
         );
@@ -549,6 +551,42 @@ export default function EditProductPage() {
           title: "Product updated",
           description: `${data.name} has been updated successfully.`,
         });
+
+        // Update originalData with the backend response to capture newly assigned IDs
+        // This prevents duplicate image creation on subsequent edits
+        setOriginalData((prev) => {
+          if (!prev) return prev;
+          const updatedImages = (updatedProduct.images || [])
+            .filter((img) => img.url?.trim())
+            .map((img, index) => ({
+              id: img.id,
+              url: img.url,
+              altText: img.altText || "",
+              position: index,
+            }));
+          return {
+            ...prev,
+            name: updatedProduct.name,
+            description: updatedProduct.description,
+            productDetailsHtml: updatedProduct.productDetailsHtml,
+            categoryId: updatedProduct.categoryId,
+            isActive: updatedProduct.isActive,
+            variants: updatedProduct.variants
+              .filter((v) => !v.isDeleted)
+              .map((v) => ({
+                id: v.id,
+                sku: v.sku,
+                price: v.price,
+                stock: v.stock,
+                discountType: v.discountType ?? null,
+                discountValue: v.discountValue ?? null,
+                discountStart: v.discountStart ?? null,
+                discountEnd: v.discountEnd ?? null,
+              })),
+            images: updatedImages,
+          };
+        });
+
         router.push("/admin/products");
       } catch {
         toast({
@@ -841,22 +879,35 @@ export default function EditProductPage() {
           </FadeIn>
 
           {/* Images */}
-           <FadeIn delay={0.3}>
-             <div className="bg-card rounded-lg border p-6 shadow-card">
-               <ProductImageGallery
-                 images={(watch("images") || []).map((img, idx) => ({
-                   id: img.id,
-                   url: img.url,
-                   altText: img.altText || "",
-                   position:
-                     typeof img.position === "number" ? img.position : idx,
-                 }))}
-                 onUpload={(imgs) => setValue("images", imgs)}
-                 onRemove={handleImageRemove}
-                 deletingImageId={deletingImageId}
-               />
-             </div>
-           </FadeIn>
+          <FadeIn delay={0.3}>
+            <div className="bg-card rounded-lg border p-6 shadow-card">
+              <ProductImageGallery
+                images={(watch("images") || []).map((img, idx) => ({
+                  id: img.id,
+                  url: img.url,
+                  publicId: img.publicId,
+                  altText: img.altText || "",
+                  position:
+                    typeof img.position === "number" ? img.position : idx,
+                }))}
+                onUpload={(imgs) => setValue("images", imgs)}
+                onRemove={(idx) => {
+                  const current = watch("images") || [];
+                  const filtered = current?.filter((_, i) => i !== idx);
+                  setValue(
+                    "images",
+                    filtered.map((img, i) => ({
+                      id: img.id,
+                      url: img.url,
+                      publicId: img.publicId,
+                      altText: img.altText || "",
+                      position: i,
+                    })),
+                  );
+                }}
+              />
+            </div>
+          </FadeIn>
 
           {/* Actions */}
           <FadeIn delay={0.4} className="flex gap-4 justify-end">

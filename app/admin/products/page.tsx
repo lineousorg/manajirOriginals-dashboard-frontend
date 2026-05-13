@@ -142,7 +142,7 @@ const ProductsPage = () => {
     return Object.fromEntries(categories.map((cat) => [cat.id, cat.name]));
   }, []);
 
-  console.log(filteredProducts);
+  // console.log(filteredProducts);
 
   return (
     <PageTransition>

@@ -46,8 +46,9 @@ export const productSchema = z.object({
   ).min(1, "At least one variant is required"),
   images: z.array(
     z.object({
-      id: z.number().optional(),
+      id: z.number().optional(), // Image ID for existing images (edit mode)
       url: z.string().min(1, "Image URL is required"),
+      publicId: z.string().optional(), // Cloudinary public ID for deletion
       altText: z.string().optional(),
       position: z.number(),
     })

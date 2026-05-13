@@ -69,6 +69,7 @@ export interface Product {
 export interface ProductImage {
   id?: number;
   url: string;
+  publicId?: string;
   altText: string;
   position: number;
 }
