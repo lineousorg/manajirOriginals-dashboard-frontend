@@ -149,13 +149,16 @@ export const productsApi = {
   ): Promise<void> => {
     await api.delete(`/products/${productId}/variants/${variantId}`);
   },
-  // Delete product image
-  deleteImage: async (
-    productId: number,
-    imageId: number,
-  ): Promise<void> => {
-    await api.delete(`/products/${productId}/images/${imageId}`);
-  },
+  // Delete product image (also sends publicId for Cloudinary cleanup)
+   deleteImage: async (
+     productId: number,
+     imageId: number,
+     publicId?: string,
+   ): Promise<void> => {
+     await api.delete(`/products/${productId}/images/${imageId}`, {
+       data: { publicId },
+     });
+   },
   // Get products by category slug with pagination and filters
   getByCategorySlug: async (
     slug: string,

@@ -71,11 +71,12 @@ export default function EditProductPage() {
       discountEnd?: string | null;
     }>;
     images: Array<{
-      id?: number;
-      url: string;
-      altText: string;
-      position: number;
-    }>;
+       id?: number;
+       url: string;
+       publicId?: string;
+       altText: string;
+       position: number;
+     }>;
   } | null>(null);
 
   // Filter active variants once - used throughout the component
@@ -155,14 +156,15 @@ export default function EditProductPage() {
           discountEnd: v.discountEnd ?? null,
         })),
         images:
-          product.images
-            ?.filter((img) => img.url?.trim())
-            .map((img, index) => ({
-              id: img.id,
-              url: img.url,
-              altText: img.altText || "",
-              position: index,
-            })) || [],
+           product.images
+             ?.filter((img) => img.url?.trim())
+             .map((img, index) => ({
+               id: img.id,
+               url: img.url,
+               publicId: img.publicId,
+               altText: img.altText || "",
+               position: index,
+             })) || [],
       });
       setInitialized(true);
     }
@@ -289,15 +291,14 @@ export default function EditProductPage() {
   );
 
   const handleImageRemove = useCallback(
-    async (index: number, imageId?: number) => {
-       console.log("clickied");
-      // If image has an ID, it exists in the backend - delete it
-      if (imageId) {
-        setDeletingImageId(imageId);
-        try {
-          await productsApi.deleteImage(id, imageId);
-          const updated = await productsApi.getById(id);
-          setProduct(updated);
+     async (index: number, imageId?: number, publicId?: string) => {
+       // If image has an ID, it exists in the backend - delete it
+       if (imageId) {
+         setDeletingImageId(imageId);
+         try {
+           await productsApi.deleteImage(id, imageId, publicId);
+           const updated = await productsApi.getById(id);
+           setProduct(updated);
 
           // Reset form with updated product data
           const updatedActiveVariants = updated.variants?.filter(
@@ -341,14 +342,15 @@ export default function EditProductPage() {
               discountEnd: v.discountEnd ?? null,
             })),
             images:
-              updated.images
-                ?.filter((img) => img.url?.trim())
-                .map((img, idx) => ({
-                  id: img.id,
-                  url: img.url,
-                  altText: img.altText || "",
-                  position: idx,
-                })) || [],
+               updated.images
+                 ?.filter((img) => img.url?.trim())
+                 .map((img, idx) => ({
+                   id: img.id,
+                   url: img.url,
+                   publicId: img.publicId,
+                   altText: img.altText || "",
+                   position: idx,
+                 })) || [],
           });
 
           toast({
@@ -510,20 +512,22 @@ export default function EditProductPage() {
 
         // Check if images changed - compare full normalized arrays
         const normalizedOriginalImages = originalData.images.map((img, index) => ({
-          id: img.id,
-          url: img.url,
-          altText: img.altText || "",
-          position: index,
-        }));
+           id: img.id,
+           url: img.url,
+           publicId: img.publicId,
+           altText: img.altText || "",
+           position: index,
+         }));
 
-        const normalizedCurrentImages = (data.images || [])
-          .filter((img) => img.url?.trim())
-          .map((img, index) => ({
-            id: img.id,
-            url: img.url,
-            altText: img.altText || "",
-            position: index,
-          }));
+         const normalizedCurrentImages = (data.images || [])
+           .filter((img) => img.url?.trim())
+           .map((img, index) => ({
+             id: img.id,
+             url: img.url,
+             publicId: img.publicId,
+             altText: img.altText || "",
+             position: index,
+           }));
 
         const imagesChanged =
           JSON.stringify(normalizedOriginalImages) !==
@@ -587,7 +591,7 @@ export default function EditProductPage() {
           };
         });
 
-        router.push("/admin/products");
+        // router.push("/admin/products");
       } catch {
         toast({
           title: "Error",
@@ -596,7 +600,7 @@ export default function EditProductPage() {
         });
       }
     },
-    [id, router, toast, originalData], 
+    [id, toast, originalData], 
   );
 
   const handleVariantAdd = () => {
@@ -891,20 +895,9 @@ export default function EditProductPage() {
                     typeof img.position === "number" ? img.position : idx,
                 }))}
                 onUpload={(imgs) => setValue("images", imgs)}
-                onRemove={(idx) => {
-                  const current = watch("images") || [];
-                  const filtered = current?.filter((_, i) => i !== idx);
-                  setValue(
-                    "images",
-                    filtered.map((img, i) => ({
-                      id: img.id,
-                      url: img.url,
-                      publicId: img.publicId,
-                      altText: img.altText || "",
-                      position: i,
-                    })),
-                  );
-                }}
+                onRemove={(idx, imageId, publicId) => {
+                   handleImageRemove(idx, imageId, publicId);
+                 }}
               />
             </div>
           </FadeIn>

@@ -21,7 +21,7 @@ interface UploadingImage {
 interface ProductImageGalleryProps {
   images: ProductImage[];
   onUpload: (images: ProductImage[]) => void;
-  onRemove: (index: number, imageId?: number) => void;
+  onRemove: (index: number, imageId?: number, publicId?: string) => void;
   deletingImageId?: number | null;
 }
 
@@ -221,7 +221,7 @@ export default function ProductImageGallery({
                     if (isUploading) return;
                     // Only allow removal of existing images (not uploading ones)
                     if (index < images.length) {
-                      onRemove(index);
+                      onRemove(index, images[index]?.id, images[index]?.publicId);
                     }
                   }}
                   disabled={isUploading}
