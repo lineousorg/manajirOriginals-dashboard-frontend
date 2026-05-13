@@ -44,7 +44,7 @@ export const useProducts = () => {
     setError(null);
     try {
       const response: PaginatedResponse<Product> = await productsApi.getAll(params);
-      console.log(response);
+      // console.log(response);
       setProducts(response.data);
       setPagination({
         page: response.pagination.page,
@@ -67,7 +67,7 @@ export const useProducts = () => {
     setError(null);
     try {
       const response: PaginatedResponse<Product> = await productsApi.getByCategorySlug(slug, params);
-      console.log(response);
+      // console.log(response);
       setProducts(response.data);
       setPagination({
         page: response.pagination.page,
@@ -129,7 +129,7 @@ export const useProducts = () => {
     setError(null);
     try {
       const created = await productsApi.create(data);
-      console.log(data);
+      // console.log(data);
       setProducts((prev) => [...prev, created]);
       return created;
     } catch (err: any) {

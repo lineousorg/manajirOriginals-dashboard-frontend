@@ -15,11 +15,12 @@ interface CloudinaryUploadResponse {
 /**
  * Upload a file to Cloudinary
  * @param file - The file to upload
- * @returns The secure URL of the uploaded image
+ * @returns The full Cloudinary response including public_id and secure_url
  */
-export const uploadToCloudinary = async (file: File): Promise<string> => {
+export const uploadToCloudinary = async (file: File): Promise<CloudinaryUploadResponse> => {
   const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
 
   if (!cloudName || !uploadPreset) {
     throw new Error("Cloudinary configuration is missing. Please check your environment variables.");
@@ -44,15 +45,15 @@ export const uploadToCloudinary = async (file: File): Promise<string> => {
   }
 
   const data: CloudinaryUploadResponse = await response.json();
-  return data.secure_url;
+  return data;
 };
 
 /**
  * Upload multiple files to Cloudinary
  * @param files - Array of files to upload
- * @returns Array of secure URLs
+ * @returns Array of Cloudinary responses
  */
-export const uploadMultipleToCloudinary = async (files: File[]): Promise<string[]> => {
+export const uploadMultipleToCloudinary = async (files: File[]): Promise<CloudinaryUploadResponse[]> => {
   const uploadPromises = files.map((file) => uploadToCloudinary(file));
   return Promise.all(uploadPromises);
 };

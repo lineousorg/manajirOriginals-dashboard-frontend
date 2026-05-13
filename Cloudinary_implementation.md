@@ -10,7 +10,7 @@ Includes error handling for failed uploads
 .env.local (updated)
 
 Added NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME - your Cloudinary cloud name
-Added NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET - your unsigned upload preset name
+Added NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET - your unsigned upload preset name 
 app/admin/products/add_product/page.tsx (updated)
 
 Replaced fileToBase64 with uploadToCloudinary
