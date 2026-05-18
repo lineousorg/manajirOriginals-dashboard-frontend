@@ -11,6 +11,7 @@ import {
   Pencil,
   Power,
   Trash2,
+  Tag,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ interface CategoryTableProps {
   onEdit: (category: Category) => void;
   onDelete: (id: number) => void;
   onToggleStatus: (id: number) => void;
+  onManageAttributes?: (category: Category) => void;
 }
 
 const CategoryTable = ({
@@ -46,6 +48,7 @@ const CategoryTable = ({
   onEdit,
   onDelete,
   onToggleStatus,
+  onManageAttributes,
 }: CategoryTableProps) => {
   // Get top-level categories (those without a parent)
   const topLevelCategories = categories?.filter((cat) => cat.parentId === null);
@@ -163,6 +166,12 @@ const CategoryTable = ({
                   <Pencil className="w-4 h-4 mr-2" />
                   Edit
                 </DropdownMenuItem>
+                {onManageAttributes && (
+                  <DropdownMenuItem onClick={() => onManageAttributes(category)}>
+                    <Tag className="w-4 h-4 mr-2" />
+                    Manage Attributes
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => onToggleStatus(category.id)}>
                   <Power className="w-4 h-4 mr-2" />
                   {category.isActive ? "Deactivate" : "Activate"}

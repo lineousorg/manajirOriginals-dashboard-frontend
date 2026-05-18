@@ -17,6 +17,7 @@ import { useProduct } from "@/hooks/useProduct";
 import { useCategories } from "@/hooks/useCategories";
 import { useAttributes } from "@/hooks/useAttributes";
 import { useAttributeValues } from "@/hooks/useAttributeValues";
+import { useCategoryAttributes } from "@/hooks/useCategoryAttributes";
 import { productsApi } from "@/services/api";
 import {
   productSchema,
@@ -43,6 +44,7 @@ export default function EditProductPage() {
   const { categories, isLoading: isLoadingCategories } = useCategories();
   const { attributes } = useAttributes();
   const { attributeValues } = useAttributeValues();
+  const { fetchCategoryAttributes } = useCategoryAttributes();
   const { toast } = useToast();
 
   const [togglingVariantId, setTogglingVariantId] = useState<number | null>(
@@ -80,7 +82,40 @@ export default function EditProductPage() {
   } | null>(null);
 
   // Filter active variants once - used throughout the component
-  const activeVariants = product?.variants?.filter((v) => !v.isDeleted) || [];
+   const activeVariants = product?.variants?.filter((v) => !v.isDeleted) || [];
+
+   // Get the effective category slug for filtering attributes
+   const effectiveCategorySlug = product?.category?.slug ?? "";
+   const [categoryAttrIds, setCategoryAttrIds] = useState<number[]>([]);
+   const [isFetchingCatAttrs, setIsFetchingCatAttrs] = useState(false);
+
+    // Form ready state - ensures all prerequisites are met before allowing submission
+    const formReady = !Number.isNaN(id) && product && categories.length > 0 && initialized;
+
+    // Fetch category-scoped attributes when product category is known
+   useEffect(() => {
+     if (effectiveCategorySlug !== "") {
+       setIsFetchingCatAttrs(true);
+       fetchCategoryAttributes(effectiveCategorySlug)
+         .then((catAttrs) => {
+           setCategoryAttrIds(catAttrs.map((ca) => ca.attributeId));
+         })
+         .catch(() => {
+           setCategoryAttrIds([]);
+         })
+         .finally(() => {
+           setIsFetchingCatAttrs(false);
+         });
+     } else {
+       setCategoryAttrIds([]);
+     }
+   }, [effectiveCategorySlug, fetchCategoryAttributes]);
+
+   // Filter attributes to only show those assigned to the product's category
+   const filteredAttributes =
+     effectiveCategorySlug !== "" && categoryAttrIds.length > 0
+       ? attributes.filter((attr) => categoryAttrIds.includes(attr.id))
+       : attributes;
 
    const {
      register,
@@ -99,23 +134,22 @@ export default function EditProductPage() {
   // Wait for product and categories data before form initialization
   const isReady = product && categories.length > 0;
 
-  // DEBUG: Log category-related variables when product changes
-  useEffect(() => {
-    if (product) {
-      const effectiveCategoryId = product.categoryId ?? product.category?.id;
-      console.log("=== CATEGORY DEBUG INFO ===");
-      console.log(
-        "product.categoryId (from API):",
-        product.categoryId,
-        "- Type:",
-        typeof product.categoryId,
-      );
-      console.log("product.category.id (nested):", product.category?.id);
-      console.log("EFFECTIVE categoryId (used for form):", effectiveCategoryId);
-      console.log("product.category (nested object):", product.category);
-      console.log("product.category.name:", product.category?.name);
-    }
-  }, [product]);
+  // Log category-related variables when product changes (for debugging)
+   useEffect(() => {
+     if (product) {
+       const effectiveCategorySlug = product.category?.slug ?? "";
+       console.log("=== CATEGORY DEBUG INFO ===");
+       console.log(
+         "product.category.slug (from API):",
+         product.category?.slug,
+         "- Type:",
+         typeof product.category?.slug,
+       );
+       console.log("EFFECTIVE categorySlug (used for form):", effectiveCategorySlug);
+       console.log("product.category (nested object):", product.category);
+       console.log("product.category.name:", product.category?.name);
+     }
+   }, [product]);
 
   useEffect(() => {
     if (!initialized && isReady) {
@@ -385,8 +419,26 @@ export default function EditProductPage() {
 
   const onSubmit = useCallback(
     async (data: ProductFormData) => {
-      console.log(data);
-      if (!id || !originalData) return;
+      
+      // Validate id is a valid number
+      if (!id || Number.isNaN(id)) {
+        toast({
+          title: "Error",
+          description: "Invalid product ID. Cannot save changes.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate form is initialized
+      if (!originalData) {
+        toast({
+          title: "Error",
+          description: "Form not ready. Please wait for data to load.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       try {
         // Build update payload with only changed fields
@@ -646,8 +698,8 @@ export default function EditProductPage() {
     setExpandedIndex(0);
   };
 
-  // Loading state
-  if (isLoadingProduct || !initialized || isLoadingCategories) {
+  // Loading state - also check for invalid id
+  if (Number.isNaN(id) || isLoadingProduct || !initialized || isLoadingCategories) {
     return (
       <PageTransition>
         <div className="max-w-4xl mx-auto space-y-6">
@@ -668,8 +720,8 @@ export default function EditProductPage() {
     );
   }
 
-  // Error state
-  if (error || !product) {
+  // Error state - also catch invalid id
+  if (error || !product || Number.isNaN(id)) {
     return (
       <PageTransition>
         <div className="flex flex-col items-center justify-center py-16">
@@ -850,8 +902,8 @@ export default function EditProductPage() {
                          ? activeVariants.find((av) => av.id === variant.id)
                          : undefined
                      }
-                     attributes={attributes}
-                     attributeValues={attributeValues}
+                     attributes={filteredAttributes}
+                      attributeValues={attributeValues}
                      isExpanded={expandedIndex === index}
                      onToggleExpand={() =>
                        setExpandedIndex(expandedIndex === index ? null : index)
@@ -914,7 +966,7 @@ export default function EditProductPage() {
             <Button
               type="submit"
               className="bg-accent hover:bg-accent/90 text-accent-foreground"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !formReady}
             >
               {isSubmitting ? (
                 <>

@@ -19,6 +19,9 @@ import {
   AttributeValue,
   CreateAttributeValueInput,
   UpdateAttributeValueInput,
+  CategoryAttribute,
+  CreateCategoryAttributeInput,
+  UpdateCategoryAttributeInput,
 } from "@/types/attribute";
 import {
   Discount,
@@ -189,6 +192,12 @@ export const categoriesApi = {
     return response.data.data;
   },
 
+  // Get category by slug (includes category attributes)
+  getBySlug: async (slug: string): Promise<Category> => {
+    const response = await api.get(`/categories/slug/${slug}`);
+    return response.data.data;
+  },
+
   // Create new category
   create: async (data: CreateCategoryInput): Promise<Category> => {
     const response = await api.post("/categories", data);
@@ -210,6 +219,57 @@ export const categoriesApi = {
   toggleStatus: async (id: number): Promise<Category> => {
     const response = await api.patch(`/categories/${id}/toggle-status`);
     return response.data.data;
+  },
+
+  // Get attributes assigned to a category (slug-based, matches backend)
+  getCategoryAttributes: async (slug: string): Promise<CategoryAttribute[]> => {
+    const response = await api.get(`/categories/${slug}/attributes`);
+    return response.data.data;
+  },
+
+  // Get attributes assigned to a category by slug (kept for backward compat)
+  getCategoryAttributesBySlug: async (slug: string): Promise<CategoryAttribute[]> => {
+    const response = await api.get(`/categories/slug/${slug}/attributes`);
+    return response.data.data;
+  },
+
+  // Assign an attribute to a category (slug-based, matches backend)
+  assignAttribute: async (
+    slug: string,
+    data: CreateCategoryAttributeInput,
+  ): Promise<CategoryAttribute> => {
+    const response = await api.post(`/categories/${slug}/attributes`, data);
+    return response.data.data;
+  },
+
+  // Assign an attribute to a category by slug (kept for backward compat)
+  assignAttributeBySlug: async (
+    slug: string,
+    data: CreateCategoryAttributeInput,
+  ): Promise<CategoryAttribute> => {
+    const response = await api.post(`/categories/slug/${slug}/attributes`, data);
+    return response.data.data;
+  },
+
+  // Update a category-attribute assignment (slug-based, matches backend)
+  updateCategoryAttribute: async (
+    slug: string,
+    attributeId: number,
+    data: UpdateCategoryAttributeInput,
+  ): Promise<CategoryAttribute> => {
+    const response = await api.patch(
+      `/categories/${slug}/attributes/${attributeId}`,
+      data,
+    );
+    return response.data.data;
+  },
+
+  // Remove an attribute from a category (slug-based, matches backend)
+  removeAttributeFromCategory: async (
+    slug: string,
+    attributeId: number,
+  ): Promise<void> => {
+    await api.delete(`/categories/${slug}/attributes/${attributeId}`);
   },
 };
 
@@ -288,8 +348,15 @@ export const attributesApi = {
     return response.data.data;
   },
 
+  // Soft delete an attribute
   delete: async (id: number): Promise<void> => {
     await api.delete(`/attributes/${id}`);
+  },
+
+  // Restore a soft-deleted attribute
+  restore: async (id: number): Promise<Attribute> => {
+    const response = await api.patch(`/attributes/${id}/restore`);
+    return response.data.data;
   },
 };
 
@@ -320,8 +387,15 @@ export const attributeValuesApi = {
     return response.data.data;
   },
 
+  // Soft delete an attribute value
   delete: async (id: number): Promise<void> => {
     await api.delete(`/attribute-values/${id}`);
+  },
+
+  // Restore a soft-deleted attribute value
+  restore: async (id: number): Promise<AttributeValue> => {
+    const response = await api.patch(`/attribute-values/${id}/restore`);
+    return response.data.data;
   },
 };
 

@@ -39,6 +39,8 @@ export interface ProductVariant {
   deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  // Unique key generated from attribute combination for duplicate detection
+  combinationKey: string | null;
   // Discount fields
   discountType?: "PERCENTAGE" | "FIXED" | null;
   discountValue?: number | null;

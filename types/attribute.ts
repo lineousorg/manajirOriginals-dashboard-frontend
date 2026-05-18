@@ -16,6 +16,9 @@
  * {
  *   "id": 1,
  *   "name": "Color",
+ *   "isActive": true,
+ *   "isDeleted": false,
+ *   "deletedAt": null,
  *   "createdAt": "2024-01-01T00:00:00Z",
  *   "updatedAt": "2024-01-01T00:00:00Z",
  *   "values": [
@@ -29,6 +32,12 @@ export interface Attribute {
   id: number;
   /** Name of the attribute (e.g., "Color", "Size") */
   name: string;
+  /** Whether the attribute is active */
+  isActive: boolean;
+  /** Whether the attribute is soft-deleted */
+  isDeleted: boolean;
+  /** Timestamp when the attribute was soft-deleted */
+  deletedAt: string | null;
   /** Timestamp when the attribute was created */
   createdAt: string;
   /** Timestamp when the attribute was last updated */
@@ -47,6 +56,9 @@ export interface Attribute {
  *   "value": "Red",
  *   "attributeId": 1,
  *   "attribute": { "id": 1, "name": "Color" },
+ *   "isActive": true,
+ *   "isDeleted": false,
+ *   "deletedAt": null,
  *   "createdAt": "2024-01-01T00:00:00Z",
  *   "updatedAt": "2024-01-01T00:00:00Z"
  * }
@@ -61,10 +73,43 @@ export interface AttributeValue {
   attributeId: number;
   /** Parent attribute info (included when fetching all values) */
   attribute?: Attribute;
+  /** Whether the value is active */
+  isActive: boolean;
+  /** Whether the value is soft-deleted */
+  isDeleted: boolean;
+  /** Timestamp when the value was soft-deleted */
+  deletedAt: string | null;
   /** Timestamp when the value was created */
   createdAt: string;
   /** Timestamp when the value was last updated */
   updatedAt: string;
+}
+
+/**
+ * Represents the relationship between a Category and an Attribute.
+ * This allows attributes to be scoped to specific categories.
+ */
+export interface CategoryAttribute {
+  /** Unique identifier for the category-attribute relationship */
+  id: number;
+  /** ID of the category */
+  categoryId: number;
+  /** ID of the attribute */
+  attributeId: number;
+  /** Whether this attribute can be used for variant generation */
+  isVariantSelectable: boolean;
+  /** Whether this attribute is required for products in this category */
+  isRequired: boolean;
+  /** Value restriction mode for this attribute in the category */
+  valueRestrictionMode?: 'ALL' | 'SELECTED' | 'NONE';
+  /** Specific value IDs allowed when valueRestrictionMode is SELECTED */
+  valueIds?: number[];
+  /** Timestamp when the relationship was created */
+  createdAt: string;
+  /** Timestamp when the relationship was last updated */
+  updatedAt: string;
+  /** The attribute details (included when fetching with relations) */
+  attribute?: Attribute;
 }
 
 /**
@@ -99,4 +144,34 @@ export interface CreateAttributeValueInput {
 export interface UpdateAttributeValueInput {
   /** New value string */
   value: string;
+}
+
+/**
+ * Input type for assigning an attribute to a category
+ */
+export interface CreateCategoryAttributeInput {
+  /** ID of the attribute to assign */
+  attributeId: number;
+  /** Whether this attribute can be used for variant generation */
+  isVariantSelectable?: boolean;
+  /** Whether this attribute is required for products in this category */
+  isRequired?: boolean;
+  /** Value restriction mode for this attribute in the category */
+  valueRestrictionMode?: 'ALL' | 'SELECTED' | 'NONE';
+  /** Specific value IDs allowed when valueRestrictionMode is SELECTED */
+  valueIds?: number[];
+}
+
+/**
+ * Input type for updating a category-attribute relationship
+ */
+export interface UpdateCategoryAttributeInput {
+  /** Whether this attribute can be used for variant generation */
+  isVariantSelectable?: boolean;
+  /** Whether this attribute is required for products in this category */
+  isRequired?: boolean;
+  /** Value restriction mode for this attribute in the category */
+  valueRestrictionMode?: 'ALL' | 'SELECTED' | 'NONE';
+  /** Specific value IDs allowed when valueRestrictionMode is SELECTED */
+  valueIds?: number[];
 }
