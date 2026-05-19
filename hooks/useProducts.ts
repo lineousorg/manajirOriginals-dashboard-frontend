@@ -1,12 +1,18 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-"use client"
-import { useState, useEffect, useCallback } from "react";
+"use client";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Product,
   CreateProductInput,
   UpdateProductInput,
 } from "@/types/product";
-import { productsApi, PaginationParams, PaginatedResponse } from "@/services/api";
+import {
+  productsApi,
+  PaginationParams,
+  PaginatedResponse,
+} from "@/services/api";
+
+const PAGE_LIMIT = 20;
 
 export interface PaginationState {
   page: number;
@@ -31,71 +37,189 @@ export const useProducts = () => {
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationState>({
     page: 1,
-    limit: 20,
+    limit: PAGE_LIMIT,
     total: 0,
     totalPages: 0,
     hasNext: false,
     hasPrevious: false,
   });
-  const [currentCategorySlug, setCurrentCategorySlug] = useState<string | null>(null);
+  const [currentCategorySlug, setCurrentCategorySlug] = useState<string | null>(
+    null,
+  );
+  const [currentSearch, setCurrentSearch] = useState<string | null>(null);
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isInitialMount = useRef(true);
 
   const fetchProducts = useCallback(async (params?: PaginationParams) => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    abortControllerRef.current = new AbortController();
     setIsLoading(true);
     setError(null);
+
+    const queryParams: PaginationParams = {
+      page: 1,
+      limit: PAGE_LIMIT,
+      ...params,
+    };
+
     try {
-      const response: PaginatedResponse<Product> = await productsApi.getAll(params);
-      // console.log(response);
+      const response: PaginatedResponse<Product> =
+        await productsApi.getAll(queryParams);
+
+      if (abortControllerRef.current?.signal.aborted) return;
+
       setProducts(response.data);
       setPagination({
         page: response.pagination.page,
-        limit: response.pagination.limit,
+        limit: PAGE_LIMIT,
         total: response.pagination.total,
         totalPages: response.pagination.totalPages,
         hasNext: response.pagination.hasNext,
         hasPrevious: response.pagination.hasPrevious,
       });
       setCurrentCategorySlug(null);
+      setCurrentSearch(null);
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to fetch products");
+      if (
+        err.name !== "AbortError" &&
+        !abortControllerRef.current?.signal.aborted
+      ) {
+        setError(err?.response?.data?.message || "Failed to fetch products");
+      }
     } finally {
-      setIsLoading(false);
+      if (!abortControllerRef.current?.signal.aborted) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
-  const fetchProductsByCategory = useCallback(async (slug: string, params?: CategoryProductsParams) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response: PaginatedResponse<Product> = await productsApi.getByCategorySlug(slug, params);
-      // console.log(response);
-      setProducts(response.data);
-      setPagination({
-        page: response.pagination.page,
-        limit: response.pagination.limit,
-        total: response.pagination.total,
-        totalPages: response.pagination.totalPages,
-        hasNext: response.pagination.hasNext,
-        hasPrevious: response.pagination.hasPrevious,
-      });
-      setCurrentCategorySlug(slug);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to fetch products");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const fetchProductsByCategory = useCallback(
+    async (slug: string, params?: CategoryProductsParams) => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      abortControllerRef.current = new AbortController();
+      setIsLoading(true);
+      setError(null);
+
+      const queryParams: CategoryProductsParams = {
+        page: 1,
+        limit: PAGE_LIMIT,
+        ...params,
+      };
+
+      try {
+        const response: PaginatedResponse<Product> =
+          await productsApi.getByCategorySlug(slug, queryParams);
+
+        if (abortControllerRef.current?.signal.aborted) return;
+
+        setProducts(response.data);
+        setPagination({
+          page: response.pagination.page,
+          limit: PAGE_LIMIT,
+          total: response.pagination.total,
+          totalPages: response.pagination.totalPages,
+          hasNext: response.pagination.hasNext,
+          hasPrevious: response.pagination.hasPrevious,
+        });
+        setCurrentCategorySlug(slug);
+        setCurrentSearch(null);
+      } catch (err: any) {
+        if (
+          err.name !== "AbortError" &&
+          !abortControllerRef.current?.signal.aborted
+        ) {
+          setError(err?.response?.data?.message || "Failed to fetch products");
+        }
+      } finally {
+        if (!abortControllerRef.current?.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [],
+  );
+
+  const searchProducts = useCallback(
+    async (query: string, params?: PaginationParams) => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      abortControllerRef.current = new AbortController();
+      setIsLoading(true);
+      setError(null);
+
+      const queryParams: PaginationParams = {
+        page: 1,
+        limit: PAGE_LIMIT,
+        search: query,
+        ...params,
+      };
+
+      try {
+        const response: PaginatedResponse<Product> =
+          await productsApi.getAll(queryParams);
+
+        if (abortControllerRef.current?.signal.aborted) return;
+
+        setProducts(response.data);
+        setPagination({
+          page: response.pagination.page,
+          limit: PAGE_LIMIT,
+          total: response.pagination.total,
+          totalPages: response.pagination.totalPages,
+          hasNext: response.pagination.hasNext,
+          hasPrevious: response.pagination.hasPrevious,
+        });
+        setCurrentCategorySlug(null);
+        setCurrentSearch(query);
+      } catch (err: any) {
+        if (
+          err.name !== "AbortError" &&
+          !abortControllerRef.current?.signal.aborted
+        ) {
+          setError(err?.response?.data?.message || "Failed to search products");
+        }
+      } finally {
+        if (!abortControllerRef.current?.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     fetchProducts();
+    isInitialMount.current = false;
   }, [fetchProducts]);
 
-  const goToPage = useCallback((page: number) => {
-    if (currentCategorySlug) {
-      fetchProductsByCategory(currentCategorySlug, { page, limit: pagination.limit });
-    } else {
-      fetchProducts({ page, limit: pagination.limit });
-    }
-  }, [currentCategorySlug, fetchProducts, fetchProductsByCategory, pagination.limit]);
+  const goToPage = useCallback(
+    (page: number) => {
+      const params = { page, limit: PAGE_LIMIT };
+      if (currentSearch) {
+        searchProducts(currentSearch, params);
+      } else if (currentCategorySlug) {
+        fetchProductsByCategory(currentCategorySlug, params);
+      } else {
+        fetchProducts(params);
+      }
+    },
+    [
+      currentSearch,
+      currentCategorySlug,
+      searchProducts,
+      fetchProductsByCategory,
+      fetchProducts,
+    ],
+  );
 
   const goToNextPage = useCallback(() => {
     if (pagination.hasNext) {
@@ -109,27 +233,54 @@ export const useProducts = () => {
     }
   }, [pagination.hasPrevious, pagination.page, goToPage]);
 
-  const setPageSize = useCallback((limit: number) => {
-    if (currentCategorySlug) {
-      fetchProductsByCategory(currentCategorySlug, { page: 1, limit });
-    } else {
-      fetchProducts({ page: 1, limit });
-    }
-  }, [currentCategorySlug, fetchProducts, fetchProductsByCategory]);
+  const setPageSize = useCallback(
+    (_limit: number) => {
+      if (currentSearch) {
+        searchProducts(currentSearch, { page: 1, limit: PAGE_LIMIT });
+      } else if (currentCategorySlug) {
+        fetchProductsByCategory(currentCategorySlug, {
+          page: 1,
+          limit: PAGE_LIMIT,
+        });
+      } else {
+        fetchProducts({ page: 1, limit: PAGE_LIMIT });
+      }
+    },
+    [
+      currentSearch,
+      currentCategorySlug,
+      searchProducts,
+      fetchProductsByCategory,
+      fetchProducts,
+    ],
+  );
 
-  const filterByCategory = useCallback((slug: string | null) => {
-    if (slug) {
-      fetchProductsByCategory(slug, { page: 1, limit: pagination.limit });
-    } else {
-      fetchProducts({ page: 1, limit: pagination.limit });
-    }
-  }, [fetchProducts, fetchProductsByCategory, pagination.limit]);
+  const filterByCategory = useCallback(
+    (slug: string | null) => {
+      if (slug) {
+        fetchProductsByCategory(slug, { page: 1, limit: PAGE_LIMIT });
+      } else {
+        fetchProducts({ page: 1, limit: PAGE_LIMIT });
+      }
+    },
+    [fetchProducts, fetchProductsByCategory],
+  );
+
+  const setSearchQuery = useCallback(
+    (query: string) => {
+      if (query && query.trim()) {
+        searchProducts(query.trim(), { page: 1, limit: PAGE_LIMIT });
+      } else {
+        fetchProducts({ page: 1, limit: PAGE_LIMIT });
+      }
+    },
+    [searchProducts, fetchProducts],
+  );
 
   const createProduct = async (data: CreateProductInput): Promise<Product> => {
     setError(null);
     try {
       const created = await productsApi.create(data);
-      // console.log(data);
       setProducts((prev) => [...prev, created]);
       return created;
     } catch (err: any) {
@@ -140,7 +291,7 @@ export const useProducts = () => {
 
   const updateProduct = async (
     id: number,
-    data: UpdateProductInput
+    data: UpdateProductInput,
   ): Promise<Product> => {
     setError(null);
     try {
@@ -155,7 +306,7 @@ export const useProducts = () => {
 
   const patchProduct = async (
     id: number,
-    data: Partial<UpdateProductInput>
+    data: Partial<UpdateProductInput>,
   ): Promise<Product> => {
     setError(null);
     try {
@@ -172,8 +323,6 @@ export const useProducts = () => {
     setError(null);
     try {
       await productsApi.delete(id);
-      // For soft delete, we filter out the product from the local state
-      // The API now returns products without deleted ones
       setProducts((prev) => prev?.filter((p) => p.id !== id));
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to delete product");
@@ -181,7 +330,6 @@ export const useProducts = () => {
     }
   };
 
-  // Toggle product active status
   const toggleProductActive = async (id: number): Promise<Product> => {
     setError(null);
     try {
@@ -189,30 +337,35 @@ export const useProducts = () => {
       setProducts((prev) => prev.map((p) => (p.id === id ? updated : p)));
       return updated;
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to toggle product status");
+      setError(
+        err?.response?.data?.message || "Failed to toggle product status",
+      );
       throw err;
     }
   };
 
-  // Toggle variant active status
   const toggleVariantActive = async (
     productId: number,
     variantId: number,
   ): Promise<Product> => {
     setError(null);
     try {
-      const updated = await productsApi.toggleVariantActive(productId, variantId);
+      const updated = await productsApi.toggleVariantActive(
+        productId,
+        variantId,
+      );
       setProducts((prev) =>
         prev.map((p) => (p.id === productId ? updated : p)),
       );
       return updated;
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to toggle variant status");
+      setError(
+        err?.response?.data?.message || "Failed to toggle variant status",
+      );
       throw err;
     }
   };
 
-  // Soft delete variant
   const deleteVariant = async (
     productId: number,
     variantId: number,
@@ -220,7 +373,6 @@ export const useProducts = () => {
     setError(null);
     try {
       await productsApi.deleteVariant(productId, variantId);
-      // Update local state to remove the variant
       setProducts((prev) =>
         prev.map((p) => {
           if (p.id === productId) {
@@ -249,6 +401,7 @@ export const useProducts = () => {
     goToPreviousPage,
     setPageSize,
     filterByCategory,
+    setSearchQuery,
     createProduct,
     updateProduct,
     patchProduct,

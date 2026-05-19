@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useFieldArray, useForm, Controller, useWatch } from "react-hook-form";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
@@ -48,9 +48,9 @@ const today = new Date().toISOString().split('T')[0];
 
 const variantSchema = z.object({
   sku: z.string().min(1, "SKU is required"),
-  price: z.number().min(0, "Price must be positive"),
-  stock: z.number().min(0, "Stock must be positive"),
-  attributes: z.array(attributeSchema).optional().default([]),
+  price: z.number().min(0.01, "Price must be greater than 0"),
+  stock: z.number().min(1, "Stock must be at least 1"),
+  attributes: z.array(attributeSchema).min(1, "At least one attribute value is required").optional().default([]),
   // Discount fields
   discountType: z.enum(["PERCENTAGE", "FIXED"]).optional().nullable(),
   discountValue: z.number().min(0).optional().nullable(),
@@ -167,6 +167,10 @@ const CreateProductPage = () => {
       attributes: Array<{ attributeId: number; valueId: number }>;
     }>
   >([]);
+  
+  // Refs for scrolling to error sections
+  const variantCardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const basicInfoRef = useRef<HTMLDivElement>(null);
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -288,6 +292,27 @@ const CreateProductPage = () => {
     setValue("slug", slug);
   };
 
+  // Function to scroll to the first error in the form
+  const scrollToFirstError = useCallback(() => {
+    const variantsErrors = errors.variants;
+    if (variantsErrors && Array.isArray(variantsErrors)) {
+      for (let i = 0; i < variantsErrors.length; i++) {
+        const variantError = variantsErrors[i] as { 
+          price?: { message?: string };
+          stock?: { message?: string };
+          attributes?: { message?: string };
+        } | undefined;
+        if (variantError?.price || variantError?.stock || variantError?.attributes) {
+          variantCardRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
+      }
+    }
+    if (errors.name || errors.description || errors.categoryId || errors.slug) {
+      basicInfoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [errors]);
+
   const onSubmit = async (data: ProductFormData) => {
     try {
       const productData: CreateProductInput = {
@@ -375,7 +400,7 @@ const CreateProductPage = () => {
           </div>
         </FadeIn>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+        <form onSubmit={handleSubmit(onSubmit, scrollToFirstError)} className="space-y-8">
           {/* Basic Info */}
           <FadeIn delay={0.1}>
             <div className="bg-card rounded-lg border p-6 shadow-card space-y-6">
@@ -625,6 +650,7 @@ const CreateProductPage = () => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -20 }}
                     className="grid gap-4 p-4 bg-muted/50 rounded-lg relative"
+                    ref={(el: HTMLDivElement | null) => { variantCardRefs.current[index] = el; }}
                   >
                     {/* Attributes Section */}
                     <div className="">

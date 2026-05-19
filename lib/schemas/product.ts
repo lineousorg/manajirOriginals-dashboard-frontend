@@ -14,14 +14,14 @@ export const productSchema = z.object({
     z.object({
       id: z.number().optional(), // Variant ID for updates
       sku: z.string().min(1, "SKU is required"),
-      price: z.number().min(0, "Price must be positive"),
-      stock: z.number().min(0, "Stock must be positive"),
+      price: z.number().min(0.01, "Price must be greater than 0"),
+      stock: z.number().min(1, "Stock must be at least 1"),
       attributes: z.array(
         z.object({
           attributeId: z.number(),
           valueId: z.number(),
         })
-      ),
+      ).min(1, "At least one attribute value is required"),
       // Discount fields (optional)
       discountType: z.enum(["PERCENTAGE", "FIXED"]).optional().nullable(),
       discountValue: z.number().min(0, "Discount value must be positive").optional().nullable(),

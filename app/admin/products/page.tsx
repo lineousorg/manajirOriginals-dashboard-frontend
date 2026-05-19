@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useProducts } from "@/hooks/useProducts";
 import { useCategories } from "@/hooks/useCategories";
-import { Product, ProductImage } from "@/types/product";
+import { Product } from "@/types/product";
 import { PageTransition, FadeIn } from "@/components/ui/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,7 +59,6 @@ import { Switch } from "@/components/ui/switch";
 import {
   Pagination,
   PaginationContent,
-  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
   PaginationNext,
@@ -77,9 +76,10 @@ const ProductsPage = () => {
     goToNextPage,
     goToPreviousPage,
     filterByCategory,
+    setSearchQuery,
   } = useProducts();
   const { categories } = useCategories();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [togglingId, setTogglingId] = useState<number | null>(null);
 
@@ -87,12 +87,13 @@ const ProductsPage = () => {
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const { toast } = useToast();
 
-  // Note: Server-side pagination is now used, so we display products directly from API
-  // Search and category filtering would need to be handled server-side for full pagination support
-  const filteredProducts = useMemo(() => {
-    if (!Array.isArray(products)) return [];
-    return products;
-  }, [products]);
+  // Debounce search input - 750ms delay for better UX during typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput);
+    }, 750);
+    return () => clearTimeout(timer);
+  }, [searchInput, setSearchQuery]);
 
   const handleDeleteClick = (product: Product) => {
     setProductToDelete(product);
@@ -138,12 +139,6 @@ const ProductsPage = () => {
     setProductToDelete(null);
   };
 
-  const categoryMap = useMemo(() => {
-    return Object.fromEntries(categories.map((cat) => [cat.id, cat.name]));
-  }, []);
-
-  // console.log(filteredProducts);
-
   return (
     <PageTransition>
       <div className="space-y-6">
@@ -167,8 +162,8 @@ const ProductsPage = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search products..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="pl-10"
             />
           </div>
@@ -198,7 +193,7 @@ const ProductsPage = () => {
         <FadeIn delay={0.2}>
           {isLoading ? (
             <TableSkeleton rows={5} />
-          ) : filteredProducts?.length === 0 ? (
+          ) : products?.length === 0 ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -209,11 +204,11 @@ const ProductsPage = () => {
               </div>
               <h3 className="text-lg font-medium mb-2">No products found</h3>
               <p className="text-muted-foreground mb-4">
-                {searchQuery || categoryFilter !== "all"
+                {searchInput || categoryFilter !== "all"
                   ? "Try adjusting your filters"
                   : "Get started by adding your first product"}
               </p>
-              {!searchQuery && categoryFilter === "all" && (
+              {!searchInput && categoryFilter === "all" && (
                 <Link href="/admin/products/add_product">
                   <Button className="bg-orange-500 hover:bg-accent/90 text-accent-foreground">
                     <Plus className="w-4 h-4 mr-2" />
@@ -237,7 +232,7 @@ const ProductsPage = () => {
                 </TableHeader>
                 <TableBody>
                   <AnimatePresence mode="popLayout">
-                    {filteredProducts.map((product, index) => (
+                    {products.map((product, index) => (
                       <motion.tr
                         key={product.id}
                         initial={{ opacity: 0, y: 20 }}

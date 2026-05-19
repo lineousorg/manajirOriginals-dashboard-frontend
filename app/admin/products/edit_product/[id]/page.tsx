@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, ArrowLeft, Loader2 } from "lucide-react";
@@ -54,6 +54,10 @@ export default function EditProductPage() {
   const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
   const [initialized, setInitialized] = useState(false);
+  
+  // Refs for scrolling to error sections
+  const variantCardRefs = useRef<(HTMLDivElement | null)[]>([])
+  const basicInfoRef = useRef<HTMLDivElement>(null);
   const [originalData, setOriginalData] = useState<{
     name: string;
     description: string;
@@ -82,19 +86,41 @@ export default function EditProductPage() {
   // Filter active variants once - used throughout the component
   const activeVariants = product?.variants?.filter((v) => !v.isDeleted) || [];
 
-   const {
-     register,
-     control,
-     handleSubmit,
-     reset,
-     watch,
-     setValue,
-     setError,
-     formState: { errors, isSubmitting },
-   } = useForm<ProductFormData>({
-    resolver: zodResolver(productSchema),
-    defaultValues: INITIAL_FORM as unknown as ProductFormData,
-  });
+const {
+      register,
+      control,
+      handleSubmit,
+      reset,
+      watch,
+      setValue,
+      setError,
+      formState: { errors, isSubmitting },
+    } = useForm<ProductFormData>({
+      resolver: zodResolver(productSchema),
+      defaultValues: INITIAL_FORM as unknown as ProductFormData,
+    });
+
+// Function to scroll to the first error in the form
+  const scrollToFirstError = useCallback(() => {
+    const variantsErrors = errors.variants;
+    if (variantsErrors) {
+      for (let i = 0; i < (variantsErrors as Array<unknown>).length; i++) {
+        const variantError = (variantsErrors as Array<{ 
+          price?: { message?: string };
+          stock?: { message?: string };
+          attributes?: { message?: string };
+        }>)[i];
+        if (variantError?.price || variantError?.stock || variantError?.attributes) {
+          setExpandedIndex(i);
+          variantCardRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
+      }
+    }
+    if (errors.name || errors.description || errors.categoryId) {
+      basicInfoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [errors, setExpandedIndex]);
 
   // Wait for product and categories data before form initialization
   const isReady = product && categories.length > 0;
@@ -416,10 +442,6 @@ export default function EditProductPage() {
         if (data.isActive !== originalData.isActive) {
           updateFields.isActive = data.isActive;
         }
-
-        // Check if variants changed - match by ID, not by array index
-        // This is critical because new variants are prepended to the array,
-        // so index-based matching would corrupt data
         const changedVariants = (data.variants as unknown as Array<{
           id?: number;
           sku: string;
@@ -717,7 +739,7 @@ export default function EditProductPage() {
           </div>
         </FadeIn>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+        <form onSubmit={handleSubmit(onSubmit, scrollToFirstError)} className="space-y-8">
           {/* Basic Info */}
           <FadeIn delay={0.1}>
             <div className="bg-card rounded-lg border p-6 shadow-card space-y-6">
@@ -839,46 +861,50 @@ export default function EditProductPage() {
                 </p>
               )}
 
-               <div className="space-y-4">
-                 {variants.map((variant, index) => (
-                   <VariantCard
-                     key={variant.id ?? `new-${index}`}
-                     index={index}
-                     variant={variant}
-                     backendVariant={
-                       variant.id
-                         ? activeVariants.find((av) => av.id === variant.id)
-                         : undefined
-                     }
-                     attributes={attributes}
-                     attributeValues={attributeValues}
-                     isExpanded={expandedIndex === index}
-                     onToggleExpand={() =>
-                       setExpandedIndex(expandedIndex === index ? null : index)
-                     }
-                     onRemove={() => handleVariantRemove(index)}
-                     onToggleActive={
-                       variant.id
-                         ? () => handleToggleVariantActive(Number(variant?.id))
-                         : undefined
-                     }
-                     isToggling={
-                       variant.id ? togglingVariantId === variant.id : false
-                     }
-                     isDeleting={
-                       variant.id ? deletingVariantId === variant.id : false
-                     }
-                     register={register}
-                     control={control}
-                     watch={watch}
-                     setValue={setValue}
-                     setError={setError}
-                     errors={errors}
-                     productName={watch("name")}
-                     toast={toast}
-                   />
-                 ))}
-               </div>
+<div className="space-y-4">
+                  {variants.map((variant, index) => (
+                    <div
+                      key={variant.id ?? `new-${index}`}
+                      ref={(el) => { variantCardRefs.current[index] = el; }}
+                    >
+                      <VariantCard
+                        index={index}
+                        variant={variant}
+                        backendVariant={
+                          variant.id
+                            ? activeVariants.find((av) => av.id === variant.id)
+                            : undefined
+                        }
+                        attributes={attributes}
+                        attributeValues={attributeValues}
+                        isExpanded={expandedIndex === index}
+                        onToggleExpand={() =>
+                          setExpandedIndex(expandedIndex === index ? null : index)
+                        }
+                        onRemove={() => handleVariantRemove(index)}
+                        onToggleActive={
+                          variant.id
+                            ? () => handleToggleVariantActive(Number(variant?.id))
+                            : undefined
+                        }
+                        isToggling={
+                          variant.id ? togglingVariantId === variant.id : false
+                        }
+                        isDeleting={
+                          variant.id ? deletingVariantId === variant.id : false
+                        }
+                        register={register}
+                        control={control}
+                        watch={watch}
+                        setValue={setValue}
+                        setError={setError}
+                        errors={errors}
+                        productName={watch("name")}
+                        toast={toast}
+                      />
+                    </div>
+                  ))}
+                </div>
             </div>
           </FadeIn>
 
