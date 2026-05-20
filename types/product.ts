@@ -1,4 +1,6 @@
 // Product category interface (nested in Product)
+import { ApplicableAttribute } from "./attribute";
+
 export interface ProductCategory {
   id: number;
   name: string;
@@ -63,6 +65,8 @@ export interface Product {
   category: ProductCategory;
   variants: ProductVariant[];
   images?: ProductImage[];
+  /** Attributes applicable to this product's category with value restriction rules */
+  applicableAttributes?: ApplicableAttribute[];
   createdAt: string;
   updatedAt: string;
 }

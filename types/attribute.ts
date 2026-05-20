@@ -113,6 +113,31 @@ export interface CategoryAttribute {
 }
 
 /**
+ * Represents an attribute applicable to a specific product/category,
+ * including its restriction mode and the values allowed for variant selection.
+ * This is the shape returned by the product API under `applicableAttributes`.
+ */
+export interface ApplicableAttribute {
+  /** ID of the attribute */
+  attributeId: number;
+  /** Name of the attribute */
+  name: string;
+  /** Whether this attribute is required for variants */
+  isRequired: boolean;
+  /** Whether this attribute can be used for variant generation */
+  isVariantSelectable: boolean;
+  /** Restriction mode controlling which values appear in the dropdown */
+  valueRestrictionMode: "ALL" | "SELECTED" | "NONE";
+  /** Allowed value IDs when mode is SELECTED; empty when ALL or NONE */
+  valueIds: number[];
+  /** All possible values for this attribute */
+  values: {
+    id: number;
+    value: string;
+  }[];
+}
+
+/**
  * Input type for creating a new attribute
  */
 export interface CreateAttributeInput {

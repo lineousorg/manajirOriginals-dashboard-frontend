@@ -902,8 +902,9 @@ export default function EditProductPage() {
                          ? activeVariants.find((av) => av.id === variant.id)
                          : undefined
                      }
-                     attributes={filteredAttributes}
+                      attributes={filteredAttributes}
                       attributeValues={attributeValues}
+                      applicableAttributes={product?.applicableAttributes}
                      isExpanded={expandedIndex === index}
                      onToggleExpand={() =>
                        setExpandedIndex(expandedIndex === index ? null : index)

@@ -30,7 +30,7 @@ import {
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ProductFormData } from "@/lib/schemas/product";
-import { Attribute, AttributeValue } from "@/types/attribute";
+import { Attribute, AttributeValue, ApplicableAttribute } from "@/types/attribute";
 import { useState, useEffect } from "react";
 import { generateSKU } from "@/lib/utils/product";
 import { useToast } from "@/hooks/use-toast";
@@ -59,6 +59,7 @@ interface VariantCardProps {
   };
   attributes: Attribute[];
   attributeValues: AttributeValue[];
+  applicableAttributes?: ApplicableAttribute[];
   isExpanded: boolean;
   onToggleExpand: () => void;
   onRemove: () => void;
@@ -81,6 +82,7 @@ export default function VariantCard({
   backendVariant,
   attributes,
   attributeValues,
+  applicableAttributes,
   isExpanded,
   onToggleExpand,
   onRemove,
@@ -266,7 +268,34 @@ export default function VariantCard({
                 const formValues = watch(`variants.${index}.attributes`) || [];
                 const attrValue = formValues.find((a) => a.attributeId === attr.id);
                 const currentValueId = attrValue?.valueId || 0;
-                const filteredValues = attributeValues?.filter((av) => av.attributeId === attr.id);
+
+                // Look up the applicable attribute config for this attribute
+                const applicableAttr = applicableAttributes?.find(
+                  (aa) => aa.attributeId === attr.id
+                );
+
+                // Determine which values to show in the dropdown based on valueRestrictionMode
+                let dropdownValues: AttributeValue[] = [];
+                if (applicableAttr) {
+                  if (applicableAttr.valueRestrictionMode === "ALL") {
+                    // Show all values for this attribute
+                    dropdownValues = attributeValues?.filter(
+                      (av) => av.attributeId === attr.id
+                    ) || [];
+                  } else if (applicableAttr.valueRestrictionMode === "SELECTED") {
+                    // Show only the selected value IDs
+                    const selectedIds = new Set(applicableAttr.valueIds);
+                    dropdownValues = attributeValues?.filter(
+                      (av) => av.attributeId === attr.id && selectedIds.has(av.id)
+                    ) || [];
+                  }
+                  // NONE: dropdownValues stays empty — dropdown will not be shown
+                } else {
+                  // Fallback: show all values if no applicableAttributes config found
+                  dropdownValues = attributeValues?.filter(
+                    (av) => av.attributeId === attr.id
+                  ) || [];
+                }
 
                 // For existing variants (backendVariant.id exists), show read-only display
                 // Get the attribute value directly from backend data
@@ -292,6 +321,20 @@ export default function VariantCard({
                 }
 
                 // New variants: Allow editing
+                // Skip dropdown entirely when restriction mode is NONE
+                if (applicableAttr?.valueRestrictionMode === "NONE") {
+                  return (
+                    <div key={attr.id} className="space-y-1">
+                      <span className="text-xs font-medium text-muted-foreground block">
+                        {attr.name}
+                      </span>
+                      <div className="w-[140px] h-9 px-3 py-2 border rounded-md bg-muted/50 text-sm flex items-center text-muted-foreground">
+                        Not allowed
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={attr.id} className="space-y-1">
                     <span className="text-xs font-medium text-muted-foreground block">
@@ -322,7 +365,7 @@ export default function VariantCard({
                         <SelectValue placeholder={`Select ${attr.name}`} />
                       </SelectTrigger>
                       <SelectContent className="bg-white">
-                        {filteredValues.map((val) => (
+                        {dropdownValues.map((val) => (
                           <SelectItem key={val.id} value={String(val.id)}>
                             {val.value}
                           </SelectItem>
