@@ -614,10 +614,13 @@ const {
         });
 
         // router.push("/admin/products");
-      } catch {
+      } catch (err) {
+        const errorMessage =
+          (err as { response?: { data?: { message?: string } } })?.response
+            ?.data?.message || "Failed to update product.";
         toast({
           title: "Error",
-          description: "Failed to update product.",
+          description: errorMessage,
           variant: "destructive",
         });
       }
@@ -657,7 +660,7 @@ const {
     // Explicitly reset each field for the new variant to prevent cached data
     setValue(`variants.0.sku`, newSku, { shouldValidate: false });
     setValue(`variants.0.price`, 0, { shouldValidate: false });
-    setValue(`variants.0.stock`, 0, { shouldValidate: false });
+    // setValue(`variants.0.stock`, 0, { shouldValidate: false });
     setValue(`variants.0.attributes`, [], { shouldValidate: false });
     setValue(`variants.0.discountType`, null, { shouldValidate: false });
     setValue(`variants.0.discountValue`, null, { shouldValidate: false });

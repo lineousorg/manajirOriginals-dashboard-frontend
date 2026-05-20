@@ -15,7 +15,7 @@ export const productSchema = z.object({
       id: z.number().optional(), // Variant ID for updates
       sku: z.string().min(1, "SKU is required"),
       price: z.number().min(0.01, "Price must be greater than 0"),
-      stock: z.number().min(1, "Stock must be at least 1"),
+      stock: z.number().min(0, "Stock must be a positive number"),
       attributes: z.array(
         z.object({
           attributeId: z.number(),

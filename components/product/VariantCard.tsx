@@ -589,7 +589,7 @@ function DiscountSection({
             <Input
               type="date"
               min={new Date().toISOString().split('T')[0]}
-              disabled={!discountType}
+              disabled={!discountType || !discountStart}
               {...register(`variants.${index}.discountEnd`)}
               className={errors.variants?.[index]?.discountEnd ? "border-destructive" : "text-sm"}
             />
