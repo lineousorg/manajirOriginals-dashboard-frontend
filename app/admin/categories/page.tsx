@@ -39,6 +39,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import ValueSelectionDialog from "@/components/categories/ValueSelectionDialog";
 
 const CategoriesPage = () => {
   const {
@@ -132,11 +133,19 @@ const CategoriesPage = () => {
     useState(false);
   const [isSavingAttributes, setIsSavingAttributes] = useState(false);
 
+  // Value selection dialog state
+  const [valueSelectionDialogOpen, setValueSelectionDialogOpen] =
+    useState(false);
+  const [valueSelectionAttribute, setValueSelectionAttribute] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+
   const { toast } = useToast();
 
   // Filter categories based on search
   const filteredCategories = categories?.filter((category) =>
-    category.name.toLowerCase().includes(searchQuery.toLowerCase())
+    category.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   // Handlers
@@ -296,13 +305,13 @@ const CategoriesPage = () => {
   };
 
   const handleNewImagesChange = (
-    fn: (prev: CategoryImage[]) => CategoryImage[]
+    fn: (prev: CategoryImage[]) => CategoryImage[],
   ) => {
     setNewImages(fn);
   };
 
   const handleEditImagesChange = (
-    fn: (prev: CategoryImage[]) => CategoryImage[]
+    fn: (prev: CategoryImage[]) => CategoryImage[],
   ) => {
     setEditImages(fn);
   };
@@ -316,10 +325,6 @@ const CategoriesPage = () => {
     // Fetch current category attributes
     try {
       const attrs = await getCategoryAttributes(category.slug);
-      console.log("handleManageAttributes: fetched category attributes", {
-        categorySlug: category.slug,
-        attrs,
-      });
       const initialAttrs: Record<
         number,
         {
@@ -347,18 +352,21 @@ const CategoriesPage = () => {
           isRequired: ca.isRequired,
           valueRestrictionMode: ca.valueRestrictionMode ?? "ALL",
           valueIds: ca.valueIds ?? [],
-          attribute: ca.attribute ? {
-            id: ca.attribute.id,
-            name: ca.attribute.name,
-            values: ca.attribute.values?.map(v => ({
-              id: v.id,
-              value: v.value,
-              attributeId: v.attributeId,
-              isActive: v.isActive,
-              isDeleted: v.isDeleted,
-              deletedAt: v.deletedAt
-            })) || []
-          } : undefined,
+          attribute: ca.attribute
+            ? {
+                id: ca.attribute.id,
+                name: ca.attribute.name,
+                values:
+                  ca.attribute.values?.map((v) => ({
+                    id: v.id,
+                    value: v.value,
+                    attributeId: v.attributeId,
+                    isActive: v.isActive,
+                    isDeleted: v.isDeleted,
+                    deletedAt: v.deletedAt,
+                  })) || [],
+              }
+            : undefined,
         };
       });
       setCategoryAttributes(initialAttrs);
@@ -372,7 +380,7 @@ const CategoriesPage = () => {
 
   const handleAttributeToggle = (
     attributeId: number,
-    field: "isVariantSelectable" | "isRequired"
+    field: "isVariantSelectable" | "isRequired",
   ) => {
     setCategoryAttributes((prev) => ({
       ...prev,
@@ -383,28 +391,19 @@ const CategoriesPage = () => {
     }));
   };
 
+  const handleManageAttributeValues = (attributeId: number, name: string) => {
+    setValueSelectionAttribute({ id: attributeId, name });
+    setValueSelectionDialogOpen(true);
+  };
+
   const handleSaveAttributes = async () => {
-    if (!categoryForAttributes) {
-      console.warn("handleSaveAttributes: categoryForAttributes is null");
-      return;
-    }
+    if (!categoryForAttributes) return;
     const categorySlug = categoryForAttributes.slug;
-    if (!categorySlug) {
-      console.warn(
-        "handleSaveAttributes: categorySlug is empty",
-        categoryForAttributes
-      );
-      return;
-    }
+    if (!categorySlug) return;
 
     setIsSavingAttributes(true);
     try {
-      console.log(
-        "handleSaveAttributes: saving for categorySlug",
-        categorySlug
-      );
       const currentAttrs = await getCategoryAttributes(categorySlug);
-      console.log("handleSaveAttributes: currentAttrs", currentAttrs);
       const currentAttrIds = new Set(currentAttrs.map((ca) => ca.attributeId));
       const newAttrIds = new Set(Object.keys(categoryAttributes).map(Number));
 
@@ -578,7 +577,7 @@ const CategoriesPage = () => {
             </span>
           }
           description="Assign attributes to this category and configure variant and required settings."
-          size="lg"
+          size="xl"
           showCloseButton={true}
           closeOnOverlayClick={true}
           closeOnEscape={true}
@@ -593,8 +592,8 @@ const CategoriesPage = () => {
               </div>
             ) : (
               <div className="space-y-1">
-                {/* ── Table Header ── */}
-                <div className="grid grid-cols-4 gap-0 rounded-t-lg border border-b-0 border-border/50 bg-muted/40">
+                {/* ── Header ── */}
+                <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_minmax(0,1fr)] gap-0 rounded-t-lg border border-b-0 border-border/50 bg-muted/40">
                   <div className="px-4 py-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider text-xs">
                     <div className="flex items-center gap-1.5">
                       Attribute
@@ -613,7 +612,7 @@ const CategoriesPage = () => {
                       </TooltipProvider>
                     </div>
                   </div>
-                  <div className="px-3 py-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider text-xs text-center">
+                  <div className="px-3 py-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider text-xs text-center min-w-[80px]">
                     <div className="flex items-center justify-center gap-1.5">
                       Variant
                       <TooltipProvider>
@@ -631,7 +630,7 @@ const CategoriesPage = () => {
                       </TooltipProvider>
                     </div>
                   </div>
-                  <div className="px-3 py-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider text-xs text-center">
+                  <div className="px-3 py-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider text-xs text-center min-w-[80px]">
                     <div className="flex items-center justify-center gap-1.5">
                       Required
                       <TooltipProvider>
@@ -649,9 +648,9 @@ const CategoriesPage = () => {
                       </TooltipProvider>
                     </div>
                   </div>
-                  <div className="px-3 py-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider text-xs text-center">
+                  <div className="px-3 py-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider text-xs text-center min-w-[120px]">
                     <div className="flex items-center justify-center gap-1.5">
-                      Value Restriction
+                      Restriction
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -667,196 +666,174 @@ const CategoriesPage = () => {
                       </TooltipProvider>
                     </div>
                   </div>
+                  <div className="px-4 py-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider text-xs text-right">
+                    Selected Values
+                  </div>
                 </div>
 
-                {/* ── Table Rows ── */}
+                {/* ── Card Rows ── */}
                 <div className="border border-border/50 rounded-b-lg divide-y divide-border/40">
                   <AnimatePresence>
                     {attributes
                       .filter((a) => !a.isDeleted)
-                      .map((attribute) => (
-                        <motion.div
-                          key={attribute.id}
-                          className="grid grid-cols-4 *:space-y-5 gap-0 items-center hover:bg-accent/5 transition-colors duration-150"
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -10 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          {/* Attribute Name */}
-                          <div className="px-4 py-3 flex items-center gap-3">
-                            <Tag className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                            <span className="text-sm font-medium text-foreground">
-                              {attribute.name}
-                            </span>
-                          </div>
-                      
-                          {/* Variant Selectable */}
-                          <div className="px-3 py-3 flex items-center justify-center ">
-                            <Checkbox
-                              className="border-2 border-red-500"
-                              id={`variant-${attribute.id}`}
-                              checked={
-                                categoryAttributes[attribute.id]
-                                  ?.isVariantSelectable || false
-                              }
-                              onCheckedChange={() =>
-                                handleAttributeToggle(
-                                  attribute.id,
-                                  "isVariantSelectable"
-                                )
-                              }
-                            />
-                          </div>
-                      
-                          {/* Required */}
-                          <div className="px-3 py-3 flex items-center justify-center">
-                            <Checkbox
-                              className="border-2"
-                              id={`required-${attribute.id}`}
-                              checked={
-                                categoryAttributes[attribute.id]?.isRequired ||
-                                false
-                              }
-                              onCheckedChange={() =>
-                                handleAttributeToggle(
-                                  attribute.id,
-                                  "isRequired"
-                                )
-                              }
-                            />
-                          </div>
-                      
-                          {/* Value Restriction Mode and Summary */}
-                          <div className="px-3 py-3 flex items-center justify-center">
-                            <div className="relative w-full">
-                              <div className="w-[100px]">
-                                <Select
-                                  value={
-                                    categoryAttributes[attribute.id]
-                                      ?.valueRestrictionMode ?? "ALL"
-                                  }
-                                  onValueChange={(value) => {
-                                    setCategoryAttributes((prev) => ({
-                                      ...prev,
-                                      [attribute.id]: {
-                                        ...prev[attribute.id],
-                                        valueRestrictionMode: value as
-                                          | "ALL"
-                                          | "SELECTED"
-                                          | "NONE",
-                                      },
-                                    }));
-                                  }}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Mode" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="ALL">All</SelectItem>
-                                    <SelectItem value="SELECTED">
-                                      Selected
-                                    </SelectItem>
-                                    <SelectItem value="NONE">None</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
+                      .map((attribute) => {
+                        const attrState = categoryAttributes[attribute.id];
+                        const restrictionMode =
+                          attrState?.valueRestrictionMode ?? "ALL";
+                        const selectedIds = attrState?.valueIds ?? [];
+                        const attribValues =
+                          attrState?.attribute?.values
+                            ?.filter((v) => !v.isDeleted)
+                            ?.filter((v) => selectedIds.includes(v.id))
+                            ?.filter(
+                              (
+                                v,
+                              ): v is {
+                                id: number;
+                                value: string;
+                                attributeId: number;
+                                isActive: boolean;
+                                isDeleted: boolean;
+                                deletedAt: string | null;
+                              } => Boolean(v),
+                            ) ?? [];
+                        const selectedCount = selectedIds.length;
+                        const totalActiveValues =
+                          attrState?.attribute?.values?.filter(
+                            (v) => !v.isDeleted,
+                          ).length ?? 0;
+
+                        return (
+                          <motion.div
+                            key={attribute.id}
+                            className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_minmax(0,1fr)] gap-0 items-center transition-colors duration-150"
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -10 }}
+                            transition={{ duration: 0.15 }}
+                          >
+                            {/* Col-1 · Attribute name */}
+                            <div className="px-4 py-3 flex items-center gap-3">
+                              <Tag className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                              <span className="text-sm font-medium text-foreground">
+                                {attribute.name}
+                              </span>
                             </div>
-                          </div>
 
-                          {/* Value Selection Summary (shown when SELECTED mode is chosen) */}
-                          <div className="px-3 py-3 flex items-center justify-center text-xs">
-                            {categoryAttributes[attribute.id]?.valueRestrictionMode === "SELECTED" && (
-                              <>
-                                {(categoryAttributes[attribute.id]?.valueIds || []).length > 0 && categoryAttributes[attribute.id]?.attribute?.values ? (
-                                  <div className="flex flex-wrap gap-1">
-                                    {categoryAttributes[attribute.id]!.attribute!.values
-                                      .filter(
-                                        (v) => v && !v.isDeleted &&
-                                          (categoryAttributes[attribute.id]?.valueIds || []).includes(
-                                            v.id
-                                          )
-                                      )
-                                      .map((value) => (
-                                        <div
-                                          key={value.id}
-                                          className="flex items-center gap-1"
-                                        >
-                                          <Badge
-                                            variant="secondary"
-                                            className="px-2 py-0.5 text-xs"
-                                          >
-                                            {value.value}
-                                          </Badge>
-                                        </div>
-                                      ))}
-                                  </div>
+                            {/* Col-2 · Variant Checkbox */}
+                            <div className="px-3 py-3 flex items-center justify-center ">
+                              <Checkbox
+                                id={`variant-${attribute.id}`}
+                                checked={
+                                  attrState?.isVariantSelectable || false
+                                }
+                                onCheckedChange={() =>
+                                  handleAttributeToggle(
+                                    attribute.id,
+                                    "isVariantSelectable",
+                                  )
+                                }
+                              />
+                            </div>
+
+                            {/* Col-3 · Required Checkbox */}
+                            <div className="px-3 py-3 flex items-center justify-center">
+                              <Checkbox
+                                id={`required-${attribute.id}`}
+                                checked={attrState?.isRequired || false}
+                                onCheckedChange={() =>
+                                  handleAttributeToggle(
+                                    attribute.id,
+                                    "isRequired",
+                                  )
+                                }
+                              />
+                            </div>
+
+                            {/* Col-4 · Restriction Mode */}
+                            <div className="px-3 py-3 flex items-center justify-center">
+                              <Select
+                                value={restrictionMode}
+                                onValueChange={(value) => {
+                                  setCategoryAttributes((prev) => ({
+                                    ...prev,
+                                    [attribute.id]: {
+                                      ...prev[attribute.id],
+                                      valueRestrictionMode: value as
+                                        | "ALL"
+                                        | "SELECTED"
+                                        | "NONE",
+                                    },
+                                  }));
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Mode" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="ALL">All</SelectItem>
+                                  <SelectItem value="SELECTED">
+                                    Selected
+                                  </SelectItem>
+                                  <SelectItem value="NONE">None</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Col-5 · Selected Values summary */}
+                            <div className="px-3 py-3 flex items-center justify-end gap-2">
+                              {restrictionMode === "SELECTED" ? (
+                                selectedCount > 0 ? (
+                                  <>
+                                    <Badge
+                                      variant="secondary"
+                                      className="px-2 py-0.5 text-xs"
+                                    >
+                                      {selectedCount} of {totalActiveValues}{" "}
+                                      selected
+                                    </Badge>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 px-2 text-xs text-accent hover:text-accent/80 hover:bg-accent/10"
+                                      onClick={() =>
+                                        handleManageAttributeValues(
+                                          attribute.id,
+                                          attribute.name,
+                                        )
+                                      }
+                                    >
+                                      Manage values
+                                    </Button>
+                                  </>
                                 ) : (
-                                  <span className="text-muted-foreground">No values selected</span>
-                                )}
-                              </>
-                            )}
-                            {categoryAttributes[attribute.id]?.valueRestrictionMode === "ALL" && (
-                              <span className="text-muted-foreground">All values</span>
-                            )}
-                            {categoryAttributes[attribute.id]?.valueRestrictionMode === "NONE" && (
-                              <span className="text-muted-foreground">No values</span>
-                            )}
-                          </div>
-
-                          {/* Value Selection Controls (shown only when SELECTED mode is chosen) */}
-                          <div className="px-3 py-3 flex items-center justify-center">
-                            {categoryAttributes[attribute.id]?.valueRestrictionMode === "SELECTED" && (
-                              <div className="relative w-full">
-                                <div className="w-[120px]">
-                                  <div className="flex flex-wrap gap-1">
-                                    {categoryAttributes[attribute.id]?.attribute?.values
-                                      .filter(
-                                        (v) => v && !v.isDeleted
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs text-accent hover:text-accent/80 hover:bg-accent/10"
+                                    onClick={() =>
+                                      handleManageAttributeValues(
+                                        attribute.id,
+                                        attribute.name,
                                       )
-                                      .map((value) => (
-                                        <div
-                                          key={value.id}
-                                          className="flex items-center gap-1"
-                                        >
-                                          <Checkbox
-                                            className="border-2"
-                                            checked={
-                                              (categoryAttributes[attribute.id]?.valueIds || []).includes(
-                                                value.id
-                                              )
-                                            }
-                                            onCheckedChange={() => {
-                                              setCategoryAttributes((prev) => {
-                                                const currentIds =
-                                                  categoryAttributes[attribute.id]?.valueIds || [];
-                                                const isSelected = currentIds.includes(value.id);
-                                                const newIds = isSelected
-                                                  ? currentIds.filter((id) => id !== value.id)
-                                                  : [...currentIds, value.id];
-
-                                                return {
-                                                  ...prev,
-                                                  [attribute.id]: {
-                                                    ...prev[attribute.id],
-                                                    valueIds: newIds,
-                                                  },
-                                                };
-                                              });
-                                            }}
-                                          />
-                                          <span className="text-xs text-foreground">
-                                            {value.value}
-                                          </span>
-                                        </div>
-                                      ))}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </motion.div>
-                      ))}
+                                    }
+                                  >
+                                    Select values
+                                  </Button>
+                                )
+                              ) : restrictionMode === "ALL" ? (
+                                <span className="text-xs text-muted-foreground">
+                                  All values
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">
+                                  No values
+                                </span>
+                              )}
+                            </div>
+                          </motion.div>
+                        );
+                      })}
                   </AnimatePresence>
 
                   {/* Empty state */}
@@ -871,7 +848,7 @@ const CategoriesPage = () => {
                   )}
                 </div>
 
-                {/* ── Save Button ── */}
+                {/* ── Footer ── */}
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
                   <Button
                     variant="outline"
@@ -897,6 +874,64 @@ const CategoriesPage = () => {
             )}
           </div>
         </Modal>
+
+        {/* Value selection dialog for SELECTED mode */}
+        {valueSelectionAttribute && (
+          <ValueSelectionDialog
+            open={valueSelectionDialogOpen}
+            onOpenChange={setValueSelectionDialogOpen}
+            attributeName={valueSelectionAttribute.name}
+            values={
+              categoryAttributes[valueSelectionAttribute.id]?.attribute
+                ?.values ?? []
+            }
+            selectedIds={
+              categoryAttributes[valueSelectionAttribute.id]?.valueIds ?? []
+            }
+            onToggleValue={(valueId) => {
+              setCategoryAttributes((prev) => {
+                const current = prev[valueSelectionAttribute.id];
+                const currentIds = current?.valueIds || [];
+                const isSelected = currentIds.includes(valueId);
+                const newIds = isSelected
+                  ? currentIds.filter((id) => id !== valueId)
+                  : [...currentIds, valueId];
+                return {
+                  ...prev,
+                  [valueSelectionAttribute.id]: {
+                    ...current,
+                    valueIds: newIds,
+                  },
+                };
+              });
+            }}
+            onSelectAll={() => {
+              setCategoryAttributes((prev) => {
+                const current = prev[valueSelectionAttribute.id];
+                const allIds =
+                  current?.attribute?.values
+                    ?.filter((v) => !v.isDeleted)
+                    ?.map((v) => v.id) ?? [];
+                return {
+                  ...prev,
+                  [valueSelectionAttribute.id]: {
+                    ...current,
+                    valueIds: allIds,
+                  },
+                };
+              });
+            }}
+            onClearAll={() => {
+              setCategoryAttributes((prev) => ({
+                ...prev,
+                [valueSelectionAttribute.id]: {
+                  ...prev[valueSelectionAttribute.id],
+                  valueIds: [],
+                },
+              }));
+            }}
+          />
+        )}
       </div>
     </PageTransition>
   );
