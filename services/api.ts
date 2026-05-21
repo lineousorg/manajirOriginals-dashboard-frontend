@@ -214,12 +214,12 @@ export const categoriesApi = {
   },
 };
 
-// Orders API
-export const ordersApi = {
-  getAll: async (params?: PaginationParams): Promise<PaginatedResponse<Order>> => {
-    const response = await api.get("/orders", { params });
-    return response.data;
-  },
+  // Orders API
+  export const ordersApi = {
+    getAll: async (params?: PaginationParams & { status?: string }): Promise<PaginatedResponse<Order>> => {
+      const response = await api.get("/orders", { params });
+      return response.data;
+    },
 
   getById: async (id: number): Promise<Order> => {
     const response = await api.get(`/orders/${id}`);
