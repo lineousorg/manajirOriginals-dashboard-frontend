@@ -428,15 +428,18 @@ function DiscountSection({
   const discountStart = watch(`variants.${index}.discountStart`);
   const discountEnd = watch(`variants.${index}.discountEnd`);
 
-  // Custom validation for past dates
+  // Custom validation for past dates - only for new variants, not existing backend data
   useEffect(() => {
-    if (discountStart && discountStart < today) {
-      setValue(`variants.${index}.discountStart`, "");
+    // Only validate if this is new user input, not backend data
+    if (!backendVariant?.id) {
+      if (discountStart && discountStart < today) {
+        setValue(`variants.${index}.discountStart`, "");
+      }
+      if (discountEnd && discountEnd < today) {
+        setValue(`variants.${index}.discountEnd`, "");
+      }
     }
-    if (discountEnd && discountEnd < today) {
-      setValue(`variants.${index}.discountEnd`, "");
-    }
-  }, [discountStart, discountEnd, today, index, setValue]);
+  }, [discountStart, discountEnd, today, index, setValue, backendVariant?.id]);
 
   // Calculate discounted price
   const calculateDiscountedPrice = () => {
