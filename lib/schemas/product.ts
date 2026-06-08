@@ -21,7 +21,7 @@ export const productSchema = z.object({
           attributeId: z.number(),
           valueId: z.number(),
         })
-      ).min(1, "At least one attribute value is required"),
+      ).optional(), // Changed from .min(1) to .optional()
       // Discount fields (optional)
       discountType: z.enum(["PERCENTAGE", "FIXED"]).optional().nullable(),
       discountValue: z.number().min(0, "Discount value must be positive").optional().nullable(),
@@ -42,8 +42,24 @@ export const productSchema = z.object({
           path: ["discountValue"],
         });
       }
+      // Validate FIXED discount does not exceed price
+      if (data.discountType === "FIXED" && data.discountValue !== null && data.discountValue !== undefined && data.price !== undefined && data.discountValue > data.price) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Fixed discount value cannot exceed the variant price",
+          path: ["discountValue"],
+        });
+      }
+      // Validate discountEnd is after discountStart
+      if (data.discountStart && data.discountEnd && data.discountEnd <= data.discountStart) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Discount end date must be after discount start date",
+          path: ["discountEnd"],
+        });
+      }
     })
-  ).min(1, "At least one variant is required"),
+  ).optional(), // Changed from .min(1) to .optional()
   images: z.array(
     z.object({
       id: z.number().optional(), // Image ID for existing images (edit mode)
@@ -75,6 +91,6 @@ export const INITIAL_FORM = {
   productDetailsHtml: "",
   categoryId: 0,
   isActive: true,
-  variants: [INITIAL_VARIANT],
+  variants: [],
   images: [],
 } as const;

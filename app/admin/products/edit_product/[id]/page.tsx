@@ -23,7 +23,7 @@ import {
   ProductFormData,
   INITIAL_FORM,
 } from "@/lib/schemas/product";
-import { ProductImage } from "@/types/product";
+import { ProductImage, VariantAttributeForm } from "@/types/product";
 import { transformVariantAttributes, generateSKU } from "@/lib/utils/product";
 import VariantCard from "@/components/product/VariantCard";
 import ProductImageGallery from "@/components/product/ProductImageGallery";
@@ -46,17 +46,17 @@ export default function EditProductPage() {
   const { toast } = useToast();
 
   const [togglingVariantId, setTogglingVariantId] = useState<number | null>(
-    null,
+    null
   );
   const [deletingVariantId, setDeletingVariantId] = useState<number | null>(
-    null,
+    null
   );
   const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
   const [initialized, setInitialized] = useState(false);
-  
+
   // Refs for scrolling to error sections
-  const variantCardRefs = useRef<(HTMLDivElement | null)[]>([])
+  const variantCardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const basicInfoRef = useRef<HTMLDivElement>(null);
   const [originalData, setOriginalData] = useState<{
     name: string;
@@ -73,52 +73,65 @@ export default function EditProductPage() {
       discountValue?: number | null;
       discountStart?: string | null;
       discountEnd?: string | null;
+      attributes?: VariantAttributeForm[];
     }>;
     images: Array<{
-       id?: number;
-       url: string;
-       publicId?: string;
-       altText: string;
-       position: number;
-     }>;
+      id?: number;
+      url: string;
+      publicId?: string;
+      altText: string;
+      position: number;
+    }>;
   } | null>(null);
 
   // Filter active variants once - used throughout the component
   const activeVariants = product?.variants?.filter((v) => !v.isDeleted) || [];
 
-const {
-      register,
-      control,
-      handleSubmit,
-      reset,
-      watch,
-      setValue,
-      setError,
-      formState: { errors, isSubmitting },
-    } = useForm<ProductFormData>({
-      resolver: zodResolver(productSchema),
-      defaultValues: INITIAL_FORM as unknown as ProductFormData,
-    });
+  const {
+    register,
+    control,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<ProductFormData>({
+    resolver: zodResolver(productSchema),
+    defaultValues: INITIAL_FORM as unknown as ProductFormData,
+  });
 
-// Function to scroll to the first error in the form
+  // Function to scroll to the first error in the form
   const scrollToFirstError = useCallback(() => {
     const variantsErrors = errors.variants;
     if (variantsErrors) {
       for (let i = 0; i < (variantsErrors as Array<unknown>).length; i++) {
-        const variantError = (variantsErrors as Array<{ 
-          price?: { message?: string };
-          stock?: { message?: string };
-          attributes?: { message?: string };
-        }>)[i];
-        if (variantError?.price || variantError?.stock || variantError?.attributes) {
+        const variantError = (
+          variantsErrors as Array<{
+            price?: { message?: string };
+            stock?: { message?: string };
+            attributes?: { message?: string };
+          }>
+        )[i];
+        if (
+          variantError?.price ||
+          variantError?.stock ||
+          variantError?.attributes
+        ) {
           setExpandedIndex(i);
-          variantCardRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "center" });
+          variantCardRefs.current[i]?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
           return;
         }
       }
     }
     if (errors.name || errors.description || errors.categoryId) {
-      basicInfoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      basicInfoRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
     }
   }, [errors, setExpandedIndex]);
 
@@ -134,7 +147,7 @@ const {
         "product.categoryId (from API):",
         product.categoryId,
         "- Type:",
-        typeof product.categoryId,
+        typeof product.categoryId
       );
       console.log("product.category.id (nested):", product.category?.id);
       console.log("EFFECTIVE categoryId (used for form):", effectiveCategoryId);
@@ -182,15 +195,15 @@ const {
           discountEnd: v.discountEnd ?? null,
         })),
         images:
-           product.images
-             ?.filter((img) => img.url?.trim())
-             .map((img, index) => ({
-               id: img.id,
-               url: img.url,
-               publicId: img.publicId,
-               altText: img.altText || "",
-               position: index,
-             })) || [],
+          product.images
+            ?.filter((img) => img.url?.trim())
+            .map((img, index) => ({
+              id: img.id,
+              url: img.url,
+              publicId: img.publicId,
+              altText: img.altText || "",
+              position: index,
+            })) || [],
       });
       setInitialized(true);
     }
@@ -207,7 +220,9 @@ const {
         const updatedProduct = await productsApi.getById(id);
         setProduct(updatedProduct);
 
-        const variant = updatedProduct.variants?.find((v) => v.id === variantId);
+        const variant = updatedProduct.variants?.find(
+          (v) => v.id === variantId
+        );
         toast({
           title: variant?.isActive
             ? "Variant activated"
@@ -224,7 +239,7 @@ const {
         setTogglingVariantId(null);
       }
     },
-    [id, setProduct, toast],
+    [id, setProduct, toast]
   );
 
   const handleVariantRemove = useCallback(
@@ -232,79 +247,17 @@ const {
       const current = watch("variants") || [];
       const variantToDelete = current[index];
 
-      // If this variant has an ID, it exists in the backend - delete it
+      // If this variant has an ID, it exists in the backend - mark for deletion
+      // Actual deletion will happen on form submit
       if (variantToDelete?.id) {
-        setDeletingVariantId(variantToDelete.id);
-        try {
-          await productsApi.deleteVariant(id, variantToDelete.id);
-          const updated = await productsApi.getById(id);
-          setProduct(updated);
+        // Remove variant from form state (mark for deletion)
+        const updated = current?.filter((_, i) => i !== index);
+        setValue("variants", updated);
 
-           // Reset form with updated product data
-           const updatedActiveVariants = updated.variants?.filter(
-             (v) => !v.isDeleted,
-           );
-           reset({
-             name: updated.name,
-             description: updated.description,
-             productDetailsHtml: updated.productDetailsHtml || "",
-             categoryId: updated.categoryId ?? updated.category?.id,
-             isActive: updated.isActive,
-             variants: updatedActiveVariants.map((v) => ({
-               id: v.id,
-               sku: v.sku || "",
-               price: Number(v.price) || 0,
-               stock: v.stock,
-               attributes: transformVariantAttributes(v),
-               discountType: v.discountType ?? null,
-               discountValue: v.discountValue ?? null,
-               discountStart: v.discountStart ?? null,
-               discountEnd: v.discountEnd ?? null,
-             })),
-             images: updated.images || [],
-           });
-
-           // Update original data
-           setOriginalData({
-             name: updated.name,
-             description: updated.description,
-             productDetailsHtml: updated.productDetailsHtml,
-             categoryId: updated.categoryId ?? updated.category?.id,
-             isActive: updated.isActive,
-             variants: updatedActiveVariants.map((v) => ({
-               id: v.id,
-               sku: v.sku,
-               price: Number(v.price) || 0,
-               stock: v.stock,
-               discountType: v.discountType ?? null,
-               discountValue: v.discountValue ?? null,
-               discountStart: v.discountStart ?? null,
-               discountEnd: v.discountEnd ?? null,
-             })),
-             images:
-               updated.images
-                 ?.filter((img) => img.url?.trim())
-                 .map((img, index) => ({
-                   id: img.id,
-                   url: img.url,
-                   altText: img.altText || "",
-                   position: index,
-                 })) || [],
-           });
-
-          toast({
-            title: "Variant deleted",
-            description: "The variant has been removed.",
-          });
-        } catch {
-          toast({
-            title: "Error",
-            description: "Failed to delete variant.",
-            variant: "destructive",
-          });
-        } finally {
-          setDeletingVariantId(null);
-        }
+        toast({
+          title: "Variant marked for deletion",
+          description: "The variant will be removed when you save changes.",
+        });
       } else {
         // New variant (not saved yet) - just remove from local form state
         if (current.length > 1) {
@@ -313,85 +266,30 @@ const {
         }
       }
     },
-    [id, watch, setValue, setProduct, toast, reset, setOriginalData],
+    [id, watch, setValue, toast]
   );
 
   const handleImageRemove = useCallback(
-     async (index: number, imageId?: number, publicId?: string) => {
-       // If image has an ID, it exists in the backend - delete it
-       if (imageId) {
-         setDeletingImageId(imageId);
-         try {
-           await productsApi.deleteImage(id, imageId, publicId);
-           const updated = await productsApi.getById(id);
-           setProduct(updated);
+    async (index: number, imageId?: number, publicId?: string) => {
+      // If image has an ID, it exists in the backend - mark for deletion
+      // Actual deletion will happen on form submit
+      if (imageId) {
+        // Remove image from form state (mark for deletion)
+        const current = watch("images") || [];
+        const filtered = current?.filter((_, i) => i !== index);
+        setValue(
+          "images",
+          filtered.map((img, i) => ({
+            url: img.url,
+            altText: img.altText || "",
+            position: i,
+          }))
+        );
 
-          // Reset form with updated product data
-          const updatedActiveVariants = updated.variants?.filter(
-            (v) => !v.isDeleted,
-          );
-          reset({
-            name: updated.name,
-            description: updated.description,
-            productDetailsHtml: updated.productDetailsHtml || "",
-            categoryId: updated.categoryId ?? updated.category?.id,
-            isActive: updated.isActive,
-            variants: updatedActiveVariants.map((v) => ({
-              id: v.id,
-              sku: v.sku || "",
-              price: Number(v.price) || 0,
-              stock: v.stock,
-              attributes: transformVariantAttributes(v),
-              discountType: v.discountType ?? null,
-              discountValue: v.discountValue ?? null,
-              discountStart: v.discountStart ?? null,
-              discountEnd: v.discountEnd ?? null,
-            })),
-            images: updated.images || [],
-          });
-
-          // Update original data
-          setOriginalData({
-            name: updated.name,
-            description: updated.description,
-            productDetailsHtml: updated.productDetailsHtml,
-            categoryId: updated.categoryId ?? updated.category?.id,
-            isActive: updated.isActive,
-            variants: updatedActiveVariants.map((v) => ({
-              id: v.id,
-              sku: v.sku,
-              price: Number(v.price) || 0,
-              stock: v.stock,
-              discountType: v.discountType ?? null,
-              discountValue: v.discountValue ?? null,
-              discountStart: v.discountStart ?? null,
-              discountEnd: v.discountEnd ?? null,
-            })),
-            images:
-               updated.images
-                 ?.filter((img) => img.url?.trim())
-                 .map((img, idx) => ({
-                   id: img.id,
-                   url: img.url,
-                   publicId: img.publicId,
-                   altText: img.altText || "",
-                   position: idx,
-                 })) || [],
-          });
-
-          toast({
-            title: "Image deleted",
-            description: "The image has been removed from the product.",
-          });
-        } catch {
-          toast({
-            title: "Error",
-            description: "Failed to delete image.",
-            variant: "destructive",
-          });
-        } finally {
-          setDeletingImageId(null);
-        }
+        toast({
+          title: "Image marked for deletion",
+          description: "The image will be removed when you save changes.",
+        });
       } else {
         // New image (not saved yet) - just remove from local form state
         const current = watch("images") || [];
@@ -402,11 +300,11 @@ const {
             url: img.url,
             altText: img.altText || "",
             position: i,
-          })),
+          }))
         );
       }
     },
-    [id, watch, setValue, setProduct, toast, reset, setOriginalData],
+    [id, watch, setValue, toast]
   );
 
   const onSubmit = useCallback(
@@ -442,121 +340,76 @@ const {
         if (data.isActive !== originalData.isActive) {
           updateFields.isActive = data.isActive;
         }
-        const changedVariants = (data.variants as unknown as Array<{
-          id?: number;
-          sku: string;
-          price: number;
-          stock: number;
-          discountType?: "PERCENTAGE" | "FIXED" | null;
-          discountValue?: number | null;
-          discountStart?: string | null;
-          discountEnd?: string | null;
-          attributes?: Array<{ attributeId: number; valueId: number }>;
-        }>)
-          .map((v) => {
-            // Find original by ID - this is the correct way to match variants
-            const original = v.id
-              ? originalData.variants.find((o) => o.id === v.id)
-              : null;
-
-            // Handle new variants (no id) - create new
-            if (!v.id) {
-              return {
-                sku: v.sku,
-                price: v.price,
-                stock: v.stock,
-                attributes: v.attributes || [],
-                // Include discount fields for new variants
-                ...(v.discountType && v.discountValue !== null && v.discountValue !== undefined && {
-                  discountType: v.discountType,
-                  discountValue: v.discountValue,
-                  discountStart: v.discountStart || undefined,
-                  discountEnd: v.discountEnd || undefined,
-                }),
-              };
-            }
-
-            // Existing variant but not found in originalData - treat as new (shouldn't happen)
-            if (!original) {
-              return {
-                sku: v.sku,
-                price: v.price,
-                stock: v.stock,
-                attributes: v.attributes || [],
-                ...(v.discountType && v.discountValue !== null && v.discountValue !== undefined && {
-                  discountType: v.discountType,
-                  discountValue: v.discountValue,
-                  discountStart: v.discountStart || undefined,
-                  discountEnd: v.discountEnd || undefined,
-                }),
-              };
-            }
-
-            // Check if any fields changed (including discount fields)
-            const hasChanged =
-              v.sku !== original.sku ||
-              v.price !== original.price ||
-              v.stock !== original.stock ||
-              v.discountType !== original.discountType ||
-              v.discountValue !== original.discountValue ||
-              v.discountStart !== original.discountStart ||
-              v.discountEnd !== original.discountEnd;
-
-            if (!hasChanged) return null;
-
-            // Build variant payload with ONLY changed fields
-            const updatePayload: Record<string, unknown> = { id: v.id };
-            if (v.sku !== original.sku) updatePayload.sku = v.sku;
-            if (v.price !== original.price) updatePayload.price = v.price;
-            if (v.stock !== original.stock) updatePayload.stock = v.stock;
-            
-            // Discount fields - include if changed or if discount is being set
-            if (v.discountType !== original.discountType) {
-              updatePayload.discountType = v.discountType;
-            }
-            if (v.discountValue !== original.discountValue) {
-              updatePayload.discountValue = v.discountValue;
-            }
-            if (v.discountStart !== original.discountStart) {
-              updatePayload.discountStart = v.discountStart;
-            }
-            if (v.discountEnd !== original.discountEnd) {
-              updatePayload.discountEnd = v.discountEnd;
-            }
-            
-            return updatePayload;
+        // Check if variants changed - compare complete arrays
+        // Only send variants that exist in current state (deleted ones filtered out by form state)
+        const normalizedOriginalVariants = originalData.variants.map(
+          (v, index) => ({
+            id: v.id,
+            sku: v.sku,
+            price: v.price,
+            stock: v.stock,
+            discountType: v.discountType ?? null,
+            discountValue: v.discountValue ?? null,
+            discountStart: v.discountStart ?? null,
+            discountEnd: v.discountEnd ?? null,
+            attributes: v.attributes || [],
           })
-          ?.filter(Boolean);
+        );
 
-        if (changedVariants.length > 0) {
-          updateFields.variants = changedVariants;
+        const normalizedCurrentVariants = (data.variants || []).map(
+          (v, index) => ({
+            id: v.id,
+            sku: v.sku,
+            price: v.price,
+            stock: v.stock,
+            discountType: v.discountType ?? null,
+            discountValue: v.discountValue ?? null,
+            discountStart: v.discountStart ?? null,
+            discountEnd: v.discountEnd ?? null,
+            attributes: v.attributes || [],
+          })
+        );
+
+        const variantsChanged =
+          JSON.stringify(normalizedOriginalVariants) !==
+          JSON.stringify(normalizedCurrentVariants);
+
+        if (variantsChanged) {
+          // IMPORTANT: send FULL variant array (only existing variants, deleted ones filtered out by form state)
+          // If all variants were deleted (empty array), send [{}] to trigger transactional path
+          // because backend ignores variants: [] without images or non-empty variants
+          updateFields.variants =
+            normalizedCurrentVariants.length === 0 ? [{}] : normalizedCurrentVariants;
         }
 
         // Check if images changed - compare full normalized arrays
-        const normalizedOriginalImages = originalData.images.map((img, index) => ({
-           id: img.id,
-           url: img.url,
-           publicId: img.publicId,
-           altText: img.altText || "",
-           position: index,
-         }));
+        // Only send images that exist in both original and current state (filter out deleted ones)
+        const normalizedOriginalImages = originalData.images.map(
+          (img, index) => ({
+            id: img.id,
+            url: img.url,
+            publicId: img.publicId,
+            altText: img.altText || "",
+            position: index,
+          })
+        );
 
-         const normalizedCurrentImages = (data.images || [])
-           .filter((img) => img.url?.trim())
-           .map((img, index) => ({
-             id: img.id,
-             url: img.url,
-             publicId: img.publicId,
-             altText: img.altText || "",
-             position: index,
-           }));
+        const normalizedCurrentImages = (data.images || [])
+          .filter((img) => img.url?.trim())
+          .map((img, index) => ({
+            id: img.id,
+            url: img.url,
+            publicId: img.publicId,
+            altText: img.altText || "",
+            position: index,
+          }));
 
         const imagesChanged =
           JSON.stringify(normalizedOriginalImages) !==
           JSON.stringify(normalizedCurrentImages);
 
         if (imagesChanged) {
-          // IMPORTANT: send FULL image array
+          // IMPORTANT: send FULL image array (only existing images, deleted ones filtered out by form state)
           updateFields.images = normalizedCurrentImages;
         }
 
@@ -571,7 +424,7 @@ const {
 
         const updatedProduct = await productsApi.update(
           id,
-          updateFields as unknown as import("@/types/product").UpdateProductInput,
+          updateFields as unknown as import("@/types/product").UpdateProductInput
         );
         toast({
           title: "Product updated",
@@ -587,6 +440,7 @@ const {
             .map((img, index) => ({
               id: img.id,
               url: img.url,
+              publicId: img.publicId,
               altText: img.altText || "",
               position: index,
             }));
@@ -625,7 +479,7 @@ const {
         });
       }
     },
-    [id, toast, originalData], 
+    [id, toast, originalData]
   );
 
   const handleVariantAdd = () => {
@@ -638,14 +492,14 @@ const {
       productName,
       [], // No attributes selected yet
       attributeValues,
-      0, // Index will be 0 after prepending
+      0 // Index will be 0 after prepending
     );
 
     // Add new variant at the top - completely empty (with discount fields)
-    const newVariant = { 
-      sku: newSku, 
-      price: 0, 
-      stock: 0, 
+    const newVariant = {
+      sku: newSku,
+      price: 0,
+      stock: 0,
       attributes: [],
       discountType: null,
       discountValue: null,
@@ -742,7 +596,10 @@ const {
           </div>
         </FadeIn>
 
-        <form onSubmit={handleSubmit(onSubmit, scrollToFirstError)} className="space-y-8">
+        <form
+          onSubmit={handleSubmit(onSubmit, scrollToFirstError)}
+          className="space-y-8"
+        >
           {/* Basic Info */}
           <FadeIn delay={0.1}>
             <div className="bg-card rounded-lg border p-6 shadow-card space-y-6">
@@ -824,7 +681,7 @@ const {
                     {(product?.categoryId ?? product?.category?.id) &&
                       !categories.find(
                         (c) =>
-                          c.id === (product.categoryId ?? product.category?.id),
+                          c.id === (product.categoryId ?? product.category?.id)
                       ) && (
                         <option
                           value={product.categoryId ?? product.category?.id}
@@ -864,50 +721,52 @@ const {
                 </p>
               )}
 
-<div className="space-y-4">
-                  {variants.map((variant, index) => (
-                    <div
-                      key={variant.id ?? `new-${index}`}
-                      ref={(el) => { variantCardRefs.current[index] = el; }}
-                    >
-                      <VariantCard
-                        index={index}
-                        variant={variant}
-                        backendVariant={
-                          variant.id
-                            ? activeVariants.find((av) => av.id === variant.id)
-                            : undefined
-                        }
-                        attributes={attributes}
-                        attributeValues={attributeValues}
-                        isExpanded={expandedIndex === index}
-                        onToggleExpand={() =>
-                          setExpandedIndex(expandedIndex === index ? null : index)
-                        }
-                        onRemove={() => handleVariantRemove(index)}
-                        onToggleActive={
-                          variant.id
-                            ? () => handleToggleVariantActive(Number(variant?.id))
-                            : undefined
-                        }
-                        isToggling={
-                          variant.id ? togglingVariantId === variant.id : false
-                        }
-                        isDeleting={
-                          variant.id ? deletingVariantId === variant.id : false
-                        }
-                        register={register}
-                        control={control}
-                        watch={watch}
-                        setValue={setValue}
-                        setError={setError}
-                        errors={errors}
-                        productName={watch("name")}
-                        toast={toast}
-                      />
-                    </div>
-                  ))}
-                </div>
+              <div className="space-y-4">
+                {variants.map((variant, index) => (
+                  <div
+                    key={variant.id ?? `new-${index}`}
+                    ref={(el) => {
+                      variantCardRefs.current[index] = el;
+                    }}
+                  >
+                    <VariantCard
+                      index={index}
+                      variant={variant}
+                      backendVariant={
+                        variant.id
+                          ? activeVariants.find((av) => av.id === variant.id)
+                          : undefined
+                      }
+                      attributes={attributes}
+                      attributeValues={attributeValues}
+                      isExpanded={expandedIndex === index}
+                      onToggleExpand={() =>
+                        setExpandedIndex(expandedIndex === index ? null : index)
+                      }
+                      onRemove={() => handleVariantRemove(index)}
+                      onToggleActive={
+                        variant.id
+                          ? () => handleToggleVariantActive(Number(variant?.id))
+                          : undefined
+                      }
+                      isToggling={
+                        variant.id ? togglingVariantId === variant.id : false
+                      }
+                      isDeleting={
+                        variant.id ? deletingVariantId === variant.id : false
+                      }
+                      register={register}
+                      control={control}
+                      watch={watch}
+                      setValue={setValue}
+                      setError={setError}
+                      errors={errors}
+                      productName={watch("name")}
+                      toast={toast}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </FadeIn>
 
@@ -925,8 +784,8 @@ const {
                 }))}
                 onUpload={(imgs) => setValue("images", imgs)}
                 onRemove={(idx, imageId, publicId) => {
-                   handleImageRemove(idx, imageId, publicId);
-                 }}
+                  handleImageRemove(idx, imageId, publicId);
+                }}
               />
             </div>
           </FadeIn>
