@@ -6,6 +6,7 @@ import {
   UseFormSetValue,
   FieldErrors,
   Control,
+  UseFormSetError,
 } from "react-hook-form";
 import { Plus, Trash2, ChevronUp, ChevronDown, Loader2, Tag, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -20,15 +21,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ProductFormData } from "@/lib/schemas/product";
 import { Attribute, AttributeValue } from "@/types/attribute";
 import { useState, useEffect } from "react";
+import { generateSKU } from "@/lib/utils/product";
+import { useToast } from "@/hooks/use-toast";
 
 interface VariantCardProps {
   index: number;
@@ -64,8 +69,10 @@ interface VariantCardProps {
   control: Control<ProductFormData>;
   watch: UseFormWatch<ProductFormData>;
   setValue: UseFormSetValue<ProductFormData>;
+  setError: UseFormSetError<ProductFormData>;
   errors: FieldErrors<ProductFormData>;
   productName?: string;
+  toast: (props: { title: string; description?: string; variant?: "default" | "destructive" }) => void;
 }
 
 export default function VariantCard({
@@ -84,9 +91,11 @@ export default function VariantCard({
   control,
   watch,
   setValue,
+  setError,
   errors,
   productName = "",
 }: VariantCardProps) {
+  const { toast } = useToast();
   // Initialize discount values from backend variant data
   useEffect(() => {
     if (backendVariant?.id) {
@@ -185,18 +194,24 @@ export default function VariantCard({
             {/* SKU */}
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">SKU</Label>
-              <Input
-                placeholder="SKU-123"
-                {...register(`variants.${index}.sku`)}
-                className={
-                  errors.variants?.[index]?.sku ? "border-destructive" : ""
-                }
-              />
-              {errors.variants?.[index]?.sku && (
-                <p className="text-xs text-destructive">
-                  {errors.variants[index]?.sku?.message}
-                </p>
-              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Input
+                    placeholder="SKU-123"
+                    {...register(`variants.${index}.sku`)}
+                    disabled
+                    className={
+                      errors.variants?.[index]?.sku ? "border-destructive" : ""
+                    }
+                  />
+                </TooltipTrigger>
+                <TooltipContent className="bg-white">
+                  <p>SKU is auto generated</p>
+                  <p className="text-muted-foreground text-xs mt-1">
+                    Formula: <code className="text-foreground">{`{ProductNameAbbreviation}-{AttributeValueCode1}-{AttributeValueCode2}-...-{VariantIndex}`}</code>
+                  </p>
+                </TooltipContent>
+              </Tooltip>
             </div>
 
             {/* Price */}
@@ -256,14 +271,14 @@ export default function VariantCard({
                 // For existing variants (backendVariant.id exists), show read-only display
                 // Get the attribute value directly from backend data
                 const isExistingVariant = !!backendVariant?.id;
-                
+
                 if (isExistingVariant) {
                   // Get attribute value from backend data
                   const backendAttr = backendVariant?.attributes?.find(
                     (a) => a.attributeValue?.attribute?.id === attr.id
                   );
                   const backendValue = backendAttr?.attributeValue?.value || "N/A";
-                  
+
                   return (
                     <div key={attr.id} className="space-y-1">
                       <span className="text-xs font-medium text-muted-foreground block">
@@ -293,22 +308,13 @@ export default function VariantCard({
                         setValue(`variants.${index}.attributes`, currentAttrs);
 
                         // Auto-generate SKU when attributes change
-                        const attrs = watch(`variants.${index}.attributes`) || [];
-                        const nameSku = productName
-                          .toUpperCase()
-                          .replace(/[^A-Z\s-]/g, "")
-                          .split(/\s+/)
-                          ?.filter(Boolean)
-                          .map((word) => word[0])
-                          .join("");
-                        const attrValueMap: Record<number, string> = {};
-                        attributeValues.forEach((av) => {
-                          attrValueMap[av.id] = av.value.substring(0, 3).toUpperCase();
-                        });
-                        const attrCodes = attrs
-                          .map((a) => attrValueMap[a.valueId] || "")
-                          ?.filter(Boolean);
-                        const newSku = `${nameSku}-${attrCodes.join("-")}-${index + 1}`.toUpperCase();
+                        // Use currentAttrs directly to avoid race condition with stale watch
+                        const newSku = generateSKU(
+                          productName,
+                          currentAttrs,
+                          attributeValues,
+                          index
+                        );
                         setValue(`variants.${index}.sku`, newSku);
                       }}
                     >
@@ -327,6 +333,13 @@ export default function VariantCard({
                 );
               })}
             </div>
+            {/* Duplicate variant error */}
+            {errors.variants?.[index]?.attributes && (
+              <p className="text-xs text-destructive flex items-center gap-1 mt-2">
+                <X className="w-3 h-3" />
+                {errors.variants[index]?.attributes?.message}
+              </p>
+            )}
           </div>
 
           {/* Status Toggle */}
@@ -355,15 +368,18 @@ export default function VariantCard({
             </div>
           )}
 
-          {/* Discount Section */}
-          <DiscountSection
-            index={index}
-            variant={variant}
-            register={register}
-            watch={watch}
-            setValue={setValue}
-            errors={errors}
-          />
+           {/* Discount Section */}
+           <DiscountSection
+             index={index}
+             variant={variant}
+             backendVariant={backendVariant}
+             register={register}
+             watch={watch}
+             setValue={setValue}
+             setError={setError}
+             errors={errors}
+             toast={toast}
+           />
         </div>
       )}
     </div>
@@ -374,19 +390,31 @@ export default function VariantCard({
 interface DiscountSectionProps {
   index: number;
   variant: ProductFormData["variants"][0];
+  backendVariant?: {
+    id: number;
+    discountType?: string | null;
+    discountValue?: number | string | null;
+    discountStart?: string | null;
+    discountEnd?: string | null;
+  };
   register: UseFormRegister<ProductFormData>;
   watch: UseFormWatch<ProductFormData>;
   setValue: UseFormSetValue<ProductFormData>;
+  setError: UseFormSetError<ProductFormData>;
   errors: FieldErrors<ProductFormData>;
+  toast: (props: { title: string; description?: string; variant?: "default" | "destructive" }) => void;
 }
 
 function DiscountSection({
   index,
   variant,
+  backendVariant,
   register,
   watch,
   setValue,
+  setError,
   errors,
+  toast,
 }: DiscountSectionProps) {
   const [isOpen, setIsOpen] = useState(false);
   const discountType = watch(`variants.${index}.discountType`);
@@ -400,15 +428,18 @@ function DiscountSection({
   const discountStart = watch(`variants.${index}.discountStart`);
   const discountEnd = watch(`variants.${index}.discountEnd`);
 
-  // Custom validation for past dates
+  // Custom validation for past dates - only for new variants, not existing backend data
   useEffect(() => {
-    if (discountStart && discountStart < today) {
-      setValue(`variants.${index}.discountStart`, "");
+    // Only validate if this is new user input, not backend data
+    if (!backendVariant?.id) {
+      if (discountStart && discountStart < today) {
+        setValue(`variants.${index}.discountStart`, "");
+      }
+      if (discountEnd && discountEnd < today) {
+        setValue(`variants.${index}.discountEnd`, "");
+      }
     }
-    if (discountEnd && discountEnd < today) {
-      setValue(`variants.${index}.discountEnd`, "");
-    }
-  }, [discountStart, discountEnd, today, index, setValue]);
+  }, [discountStart, discountEnd, today, index, setValue, backendVariant?.id]);
 
   // Calculate discounted price
   const calculateDiscountedPrice = () => {
@@ -440,7 +471,7 @@ function DiscountSection({
           <div className="flex items-center gap-2">
             <Tag className="w-4 h-4 text-muted-foreground" />
             <span className="text-sm font-medium">Discount (Optional)</span>
-            {hasDiscount && (
+            {hasDiscount && backendVariant?.id && (
               <Badge variant="secondary" className="text-xs">
                 Active
               </Badge>
@@ -461,9 +492,7 @@ function DiscountSection({
             value={discountType || ""}
             onValueChange={(val) => {
               setValue(`variants.${index}.discountType`, val as "PERCENTAGE" | "FIXED");
-              if (!watch(`variants.${index}.discountValue`)) {
-                setValue(`variants.${index}.discountValue`, 0);
-              }
+              // Don't auto-set discountValue - let user enter their own value
             }}
             className="flex gap-4"
           >
@@ -488,17 +517,52 @@ function DiscountSection({
             Value {discountType === "PERCENTAGE" ? "(%) " : "(BDT) "}
             {discountType === "PERCENTAGE" && "(max 100)"}
           </Label>
-          <Input
-            type="number"
-            step={discountType === "PERCENTAGE" ? "1" : "1"}
-            min={0}
-            max={discountType === "PERCENTAGE" ? 100 : undefined}
-            placeholder={discountType === "PERCENTAGE" ? "20" : "300"}
-            {...register(`variants.${index}.discountValue`, {
-              valueAsNumber: true,
-            })}
-            className={errors.variants?.[index]?.discountValue ? "border-destructive" : ""}
-          />
+            <Input
+              type="number"
+              step={discountType === "PERCENTAGE" ? "1" : "1"}
+              min={0}
+              max={discountType === "PERCENTAGE" ? 100 : undefined}
+              placeholder={discountType === "PERCENTAGE" ? "20" : "300"}
+              disabled={!discountType}
+              {...register(`variants.${index}.discountValue`, {
+                valueAsNumber: true,
+              })}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value) || 0;
+                // Update form state
+                setValue(`variants.${index}.discountValue`, value, { shouldValidate: true });
+                // Clear any existing error
+                setError(`variants.${index}.discountValue`, { type: "manual", message: "" });
+                
+                // Real-time validation
+                if (discountType === "PERCENTAGE") {
+                  if (value > 100) {
+                    setError(`variants.${index}.discountValue`, {
+                      type: "manual",
+                      message: "Percentage cannot exceed 100"
+                    });
+                    toast({
+                      title: "Invalid Percentage",
+                      description: "Percentage cannot be more than 100",
+                      variant: "destructive"
+                    });
+                  }
+                } else if (discountType === "FIXED") {
+                  if (value > price) {
+                    setError(`variants.${index}.discountValue`, {
+                      type: "manual",
+                      message: `Fixed discount cannot exceed product price (৳${price})`
+                    });
+                    toast({
+                      title: "Invalid Fixed Discount",
+                      description: `Fixed discount cannot be more than product price (৳${price})`,
+                      variant: "destructive"
+                    });
+                  }
+                }
+              }}
+              className={errors.variants?.[index]?.discountValue ? "border-destructive" : ""}
+            />
           {errors.variants?.[index]?.discountValue && (
             <p className="text-xs text-destructive">
               {errors.variants[index]?.discountValue?.message}
@@ -513,6 +577,7 @@ function DiscountSection({
             <Input
               type="date"
               min={new Date().toISOString().split('T')[0]}
+              disabled={!discountType}
               {...register(`variants.${index}.discountStart`)}
               className={errors.variants?.[index]?.discountStart ? "border-destructive" : "text-sm"}
             />
@@ -527,6 +592,7 @@ function DiscountSection({
             <Input
               type="date"
               min={new Date().toISOString().split('T')[0]}
+              disabled={!discountType || !discountStart}
               {...register(`variants.${index}.discountEnd`)}
               className={errors.variants?.[index]?.discountEnd ? "border-destructive" : "text-sm"}
             />
@@ -580,3 +646,4 @@ function DiscountSection({
     </Collapsible>
   );
 }
+

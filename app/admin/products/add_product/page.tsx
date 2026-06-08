@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useFieldArray, useForm, Controller, useWatch } from "react-hook-form";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import { Plus, Trash2, ArrowLeft, Loader2 } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Loader2, X } from "lucide-react";
 import { useProducts } from "@/hooks/useProducts";
 import { useCategories } from "@/hooks/useCategories";
 import { useAttributes } from "@/hooks/useAttributes";
@@ -25,6 +25,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { CreateProductInput, ProductImage } from "@/types/product";
+import RichTextEditor from "@/components/editor/RichTextEditor";
+import { generateSKU } from "@/lib/utils/product";
+import { uploadToCloudinary } from "@/lib/utils/cloudinary";
 
 // Variant attribute schema
 const attributeSchema = z.object({
@@ -35,6 +38,7 @@ const attributeSchema = z.object({
 // Image schema
 const imageSchema = z.object({
   url: z.string().min(1, "Image URL is required"),
+  publicId: z.string().optional(), // Cloudinary public ID for deletion
   altText: z.string().optional().default(""),
   position: z.number(),
 });
@@ -44,12 +48,12 @@ const today = new Date().toISOString().split('T')[0];
 
 const variantSchema = z.object({
   sku: z.string().min(1, "SKU is required"),
-  price: z.number().min(0, "Price must be positive"),
-  stock: z.number().min(0, "Stock must be positive"),
-  attributes: z.array(attributeSchema).optional().default([]),
+  price: z.number().min(0.01, "Price must be greater than 0"),
+  stock: z.number().min(1, "Stock must be at least 1"),
+  attributes: z.array(attributeSchema).min(1, "At least one attribute value is required").optional().default([]),
   // Discount fields
   discountType: z.enum(["PERCENTAGE", "FIXED"]).optional().nullable(),
-  discountValue: z.number().min(0).max(100).optional().nullable(),
+  discountValue: z.number().min(0).optional().nullable(),
   discountStart: z.string().refine(
     (val) => !val || val >= today,
     { message: "Can't select past day" }
@@ -58,59 +62,65 @@ const variantSchema = z.object({
     (val) => !val || val >= today,
     { message: "Can't select past day" }
   ).optional().nullable(),
+}).superRefine((data, ctx) => {
+  // Conditional validation: only enforce max 100 for percentage discounts
+  if (data.discountType === "PERCENTAGE" && data.discountValue !== null && data.discountValue !== undefined && data.discountValue > 100) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Percentage cannot exceed 100",
+      path: ["discountValue"],
+    });
+  }
 });
 
 // Product schema matching backend structure
 const productSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   description: z.string().min(1, "Description is required").max(500),
+  productDetailsHtml: z.string().optional(),
   slug: z.string().min(1, "Slug is required").max(100),
   categoryId: z.number().min(1, "Category is required"),
-  variants: z.array(variantSchema).min(1, "At least one variant is required"),
+  variants: z.array(variantSchema).min(1, "At least one variant is required").superRefine((variants, ctx) => {
+    // Check for duplicate variants based on attributes
+    const attributeSignatureMap = new Map<string, number[]>();
+
+    variants.forEach((variant, index) => {
+      // Create a unique signature for the variant's attributes
+      // Sort by attributeId to ensure consistent ordering
+      const sortedAttrs = [...(variant.attributes || [])].sort(
+        (a, b) => a.attributeId - b.attributeId
+      );
+      const signature = sortedAttrs
+        .map((attr) => `${attr.attributeId}:${attr.valueId}`)
+        .join(";");
+
+      if (!signature) return; // Skip variants with no attributes
+
+      if (attributeSignatureMap.has(signature)) {
+        attributeSignatureMap.get(signature)!.push(index);
+      } else {
+        attributeSignatureMap.set(signature, [index]);
+      }
+    });
+
+    // Add errors for duplicate variants
+    attributeSignatureMap.forEach((indices) => {
+      if (indices.length > 1) {
+        // All indices except the first one are considered duplicates
+        indices.slice(1).forEach((dupIndex) => {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "That variant already exists. Cannot create the same variant twice.",
+            path: [dupIndex, "attributes"],
+          });
+        });
+      }
+    });
+  }),
   images: z.array(imageSchema).optional().default([]),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
-
-// Helper function to generate SKU based on product name and variant attributes
-const generateSKU = (
-  productName: string,
-  attributes: Array<{ attributeId: number; valueId: number }>,
-  attributeValues: Array<{ id: number; value: string; attributeId: number }>,
-  variantIndex: number,
-): string => {
-  // Convert product name to uppercase without spaces, limit to first 5 characters
-  const words = productName
-    .toUpperCase()
-    .replace(/[^A-Z\s-]/g, "")
-    .split(/\s+/)
-    ?.filter(Boolean);
-
-  if (words.length === 0) return "";
-
-  const initials = words.map((word) => word[0]).join("");
-
-  const lastWordConsonants = words[words.length - 1]
-    .slice(1)
-    .replace(/[AEIOU]/g, "");
-
-  const nameSku = initials + lastWordConsonants;
-
-  // Get attribute values from the actual data
-  const attrValueMap: Record<number, string> = {};
-  attributeValues.forEach((av) => {
-    // Get first 3 characters of value, uppercase
-    attrValueMap[av.id] = av.value.substring(0, 3).toUpperCase();
-  });
-
-  // Build SKU with attribute values
-  const attrCodes = attributes
-    .map((a) => attrValueMap[a.valueId] || "")
-    ?.filter(Boolean);
-
-  // Format: NAME-ATTR1-ATTR2-VARIANTNUM (e.g., TSHIRT-RED-BLK-1)
-  return `${nameSku}-${attrCodes.join("-")}-${variantIndex + 1}`.toUpperCase();
-};
 
 const CreateProductPage = () => {
   const router = useRouter();
@@ -120,18 +130,20 @@ const CreateProductPage = () => {
   const { attributeValues, isLoading: isLoadingAttributeValues } = useAttributeValues();
   const { toast } = useToast();
 
-  const {
-    register,
-    control,
-    handleSubmit,
-    watch,
-    setValue,
-    formState: { errors, isSubmitting },
-  } = useForm<ProductFormData>({
+   const {
+     register,
+     control,
+     handleSubmit,
+     watch,
+     setValue,
+     setError,
+     formState: { errors, isSubmitting },
+   } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: {
       name: "",
       description: "",
+      productDetailsHtml: "",
       slug: "",
       categoryId: 0,
       variants: [{ 
@@ -155,6 +167,10 @@ const CreateProductPage = () => {
       attributes: Array<{ attributeId: number; valueId: number }>;
     }>
   >([]);
+  
+  // Refs for scrolling to error sections
+  const variantCardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const basicInfoRef = useRef<HTMLDivElement>(null);
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -170,36 +186,77 @@ const CreateProductPage = () => {
     name: "images",
   });
 
-  // Convert file to base64
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
-  };
+  // Track uploading images with local preview URLs
+  const [uploadingImages, setUploadingImages] = useState<Array<{
+    index: number;
+    localUrl: string;
+    fileName: string;
+  }>>([]);
 
-  // Handle image file selection
+  // Handle image file selection - upload to Cloudinary
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     const currentImages = watch("images") || [];
+    const newUploadingImages: Array<{
+      index: number;
+      localUrl: string;
+      fileName: string;
+    }> = [];
 
+    // Create local previews for all files immediately
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      const imageIndex = currentImages.length + i;
+      const localUrl = URL.createObjectURL(file);
+      
+      newUploadingImages.push({
+        index: imageIndex,
+        localUrl,
+        fileName: file.name,
+      });
+    }
+
+    // Add all to uploading state immediately (instant UI feedback)
+    setUploadingImages(prev => [...prev, ...newUploadingImages]);
+
+    // Upload each image
+    for (const upload of newUploadingImages) {
       try {
-        const base64 = await fileToBase64(file);
+        const file = files[upload.index - currentImages.length];
+        
+        // Upload to Cloudinary
+        const cloudinaryResponse = await uploadToCloudinary(file);
+        
+        // Add to form with publicId for Cloudinary deletion
         appendImage({
-          url: base64,
-          altText: file.name,
-          position: currentImages.length + i,
+          url: cloudinaryResponse.secure_url,
+          publicId: cloudinaryResponse.public_id,
+          altText: upload.fileName,
+          position: upload.index,
         });
+        
+        // Remove from uploading state
+        setUploadingImages(prev => prev.filter(u => u.index !== upload.index));
+        
+        // Clean up object URL
+        URL.revokeObjectURL(upload.localUrl);
       } catch (error) {
-        console.error("Error converting file to base64:", error);
+        console.error("Error uploading image to Cloudinary:", error);
+        toast({
+          title: "Upload Failed",
+          description: `Failed to upload ${upload.fileName}. Please try again.`,
+          variant: "destructive",
+        });
+        // Remove from uploading state (failed)
+        setUploadingImages(prev => prev.filter(u => u.index !== upload.index));
+        URL.revokeObjectURL(upload.localUrl);
       }
     }
+    
+    // Reset the input
+    e.target.value = "";
   };
 
   // Store previous SKU values to prevent infinite loop
@@ -235,11 +292,33 @@ const CreateProductPage = () => {
     setValue("slug", slug);
   };
 
+  // Function to scroll to the first error in the form
+  const scrollToFirstError = useCallback(() => {
+    const variantsErrors = errors.variants;
+    if (variantsErrors && Array.isArray(variantsErrors)) {
+      for (let i = 0; i < variantsErrors.length; i++) {
+        const variantError = variantsErrors[i] as { 
+          price?: { message?: string };
+          stock?: { message?: string };
+          attributes?: { message?: string };
+        } | undefined;
+        if (variantError?.price || variantError?.stock || variantError?.attributes) {
+          variantCardRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
+      }
+    }
+    if (errors.name || errors.description || errors.categoryId || errors.slug) {
+      basicInfoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [errors]);
+
   const onSubmit = async (data: ProductFormData) => {
     try {
       const productData: CreateProductInput = {
         name: data.name,
         description: data.description,
+        productDetailsHtml: data.productDetailsHtml || undefined,
         slug: data.slug,
         categoryId: data.categoryId,
         variants: data.variants.map((v) => ({
@@ -257,12 +336,13 @@ const CreateProductPage = () => {
         })),
         images: data.images.map((img, index) => ({
           url: img.url,
+          publicId: img.publicId,
           altText: img.altText,
           position: index,
         })),
       };
 
-      console.log(productData);
+      // console.log(productData);
 
       // Create product and get the response with productId
       const createdProduct = await createProduct(productData);
@@ -320,7 +400,7 @@ const CreateProductPage = () => {
           </div>
         </FadeIn>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+        <form onSubmit={handleSubmit(onSubmit, scrollToFirstError)} className="space-y-8">
           {/* Basic Info */}
           <FadeIn delay={0.1}>
             <div className="bg-card rounded-lg border p-6 shadow-card space-y-6">
@@ -415,6 +495,20 @@ const CreateProductPage = () => {
                   )}
                 </div>
 
+                {/* Product Details HTML */}
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="productDetailsHtml">Product Details</Label>
+                  <RichTextEditor
+                    value={watch("productDetailsHtml") || ""}
+                    onChange={(value) => setValue("productDetailsHtml", value)}
+                  />
+                  {errors.productDetailsHtml && (
+                    <p className="text-sm text-destructive">
+                      {errors.productDetailsHtml.message}
+                    </p>
+                  )}
+                </div>
+
                 {/* Images */}
                 <div className="col-span-2">
                   <Label>Product Images</Label>
@@ -445,42 +539,62 @@ const CreateProductPage = () => {
                     )}
 
                     <div className="grid gap-4 md:grid-cols-3">
-                      {imageFields.map((field, index) => (
-                        <motion.div
-                          key={field.id}
-                          initial={{ opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          className="relative group"
-                        >
-                          <div className="aspect-square bg-muted rounded-lg overflow-hidden border">
-                            <img
-                              src={watch(`images.${index}.url`)}
-                              alt={
-                                watch(`images.${index}.altText`) ||
-                                `Product image ${index + 1}`
-                              }
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div className="mt-2 space-y-2">
-                            <Input
-                              placeholder="Alt text (optional)"
-                              {...register(`images.${index}.altText`)}
-                              className="text-xs"
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeImage(index)}
-                              className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Remove
-                            </Button>
-                          </div>
-                        </motion.div>
-                      ))}
+                      {imageFields.map((field, index) => {
+                        const uploadingInfo = uploadingImages.find(u => u.index === index);
+                        const isUploading = !!uploadingInfo;
+                        
+                        return (
+                          <motion.div
+                            key={field.id}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="relative group"
+                          >
+                            <div className="aspect-square bg-muted rounded-lg overflow-hidden border">
+                              {isUploading ? (
+                                <div className="w-full h-full flex items-center justify-center relative">
+                                  <img
+                                    src={uploadingInfo!.localUrl}
+                                    alt={uploadingInfo!.fileName}
+                                    className="w-full h-full object-cover opacity-50"
+                                  />
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                                  </div>
+                                </div>
+                              ) : (
+                                <img
+                                  src={watch(`images.${index}.url`)}
+                                  alt={
+                                    watch(`images.${index}.altText`) ||
+                                    `Product image ${index + 1}`
+                                  }
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </div>
+                            <div className="mt-2 space-y-2">
+                              <Input
+                                placeholder="Alt text (optional)"
+                                {...register(`images.${index}.altText`)}
+                                className="text-xs"
+                                disabled={isUploading}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeImage(index)}
+                                disabled={isUploading}
+                                className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Remove
+                              </Button>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
                     </div>
 
                     {errors.images && (
@@ -536,6 +650,7 @@ const CreateProductPage = () => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -20 }}
                     className="grid gap-4 p-4 bg-muted/50 rounded-lg relative"
+                    ref={(el: HTMLDivElement | null) => { variantCardRefs.current[index] = el; }}
                   >
                     {/* Attributes Section */}
                     <div className="">
@@ -598,6 +713,14 @@ const CreateProductPage = () => {
                         ))}
                       </div>
                     </div>
+
+                    {/* Duplicate variant error */}
+                    {errors.variants?.[index]?.attributes && (
+                      <p className="text-sm text-destructive flex items-center gap-1 mb-4">
+                        <X className="w-4 h-4" />
+                        {errors.variants[index]?.attributes?.message}
+                      </p>
+                    )}
 
                     <div className="flex gap-4 justify-between border-t pt-4">
                       <div className="space-y-2">

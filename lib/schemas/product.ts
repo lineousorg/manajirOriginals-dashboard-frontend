@@ -7,23 +7,24 @@ const today = new Date().toISOString().split('T')[0];
 export const productSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   description: z.string().min(1, "Description is required").max(500),
+  productDetailsHtml: z.string().optional(),
   categoryId: z.number().min(1, "Category is required"),
   isActive: z.boolean().optional(),
   variants: z.array(
     z.object({
       id: z.number().optional(), // Variant ID for updates
       sku: z.string().min(1, "SKU is required"),
-      price: z.number().min(0, "Price must be positive"),
-      stock: z.number().min(0, "Stock must be positive"),
+      price: z.number().min(0.01, "Price must be greater than 0"),
+      stock: z.number().min(0, "Stock must be a positive number"),
       attributes: z.array(
         z.object({
           attributeId: z.number(),
           valueId: z.number(),
         })
-      ),
+      ).min(1, "At least one attribute value is required"),
       // Discount fields (optional)
       discountType: z.enum(["PERCENTAGE", "FIXED"]).optional().nullable(),
-      discountValue: z.number().min(0, "Discount value must be positive").max(100, "Percentage cannot exceed 100").optional().nullable(),
+      discountValue: z.number().min(0, "Discount value must be positive").optional().nullable(),
       discountStart: z.string().refine(
         (val) => !val || val >= today,
         { message: "Can't select past day" }
@@ -32,11 +33,22 @@ export const productSchema = z.object({
         (val) => !val || val >= today,
         { message: "Can't select past day" }
       ).optional().nullable(),
+    }).superRefine((data, ctx) => {
+      // Conditional validation: only enforce max 100 for percentage discounts
+      if (data.discountType === "PERCENTAGE" && data.discountValue !== null && data.discountValue !== undefined && data.discountValue > 100) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Percentage cannot exceed 100",
+          path: ["discountValue"],
+        });
+      }
     })
   ).min(1, "At least one variant is required"),
   images: z.array(
     z.object({
+      id: z.number().optional(), // Image ID for existing images (edit mode)
       url: z.string().min(1, "Image URL is required"),
+      publicId: z.string().optional(), // Cloudinary public ID for deletion
       altText: z.string().optional(),
       position: z.number(),
     })
@@ -60,6 +72,7 @@ export const INITIAL_VARIANT = {
 export const INITIAL_FORM = {
   name: "",
   description: "",
+  productDetailsHtml: "",
   categoryId: 0,
   isActive: true,
   variants: [INITIAL_VARIANT],

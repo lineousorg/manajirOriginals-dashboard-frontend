@@ -85,6 +85,7 @@ export const authApi = {
 export interface PaginationParams {
   page?: number;
   limit?: number;
+  search?: string;
 }
 
 export interface PaginatedResponse<T> {
@@ -149,6 +150,16 @@ export const productsApi = {
   ): Promise<void> => {
     await api.delete(`/products/${productId}/variants/${variantId}`);
   },
+  // Delete product image (also sends publicId for Cloudinary cleanup)
+   deleteImage: async (
+     productId: number,
+     imageId: number,
+     publicId?: string,
+   ): Promise<void> => {
+     await api.delete(`/products/${productId}/images/${imageId}`, {
+       data: { publicId },
+     });
+   },
   // Get products by category slug with pagination and filters
   getByCategorySlug: async (
     slug: string,
@@ -203,12 +214,12 @@ export const categoriesApi = {
   },
 };
 
-// Orders API
-export const ordersApi = {
-  getAll: async (params?: PaginationParams): Promise<PaginatedResponse<Order>> => {
-    const response = await api.get("/orders", { params });
-    return response.data;
-  },
+  // Orders API
+  export const ordersApi = {
+    getAll: async (params?: PaginationParams & { status?: string }): Promise<PaginatedResponse<Order>> => {
+      const response = await api.get("/orders", { params });
+      return response.data;
+    },
 
   getById: async (id: number): Promise<Order> => {
     const response = await api.get(`/orders/${id}`);

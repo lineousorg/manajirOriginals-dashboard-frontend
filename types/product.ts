@@ -52,6 +52,7 @@ export interface Product {
   name: string;
   slug: string;
   description: string;
+  productDetailsHtml?: string;
   brand: string | null;
   isActive: boolean;
   isDeleted: boolean;
@@ -68,6 +69,7 @@ export interface Product {
 export interface ProductImage {
   id?: number;
   url: string;
+  publicId?: string;
   altText: string;
   position: number;
 }
@@ -76,6 +78,7 @@ export interface CreateProductInput {
   name: string;
   slug: string;
   description: string;
+  productDetailsHtml?: string;
   categoryId: number;
   variants: CreateVariantInput[];
   images?: ProductImage[];

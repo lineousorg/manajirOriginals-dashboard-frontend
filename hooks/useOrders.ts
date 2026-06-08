@@ -19,14 +19,14 @@ export const useOrders = () => {
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationState>({
     page: 1,
-    limit: 20,
+    limit: 10,
     total: 0,
     totalPages: 0,
     hasNext: false,
     hasPrevious: false,
   });
 
-  const fetchOrders = useCallback(async (params?: PaginationParams) => {
+  const fetchOrders = useCallback(async (params?: PaginationParams & { status?: string }) => {
     setIsLoading(true);
     setError(null);
     try {

@@ -1,8 +1,7 @@
 "use client";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Search,
   Eye,
   ShoppingCart,
   Package,
@@ -12,13 +11,11 @@ import {
   Loader2,
   Download,
   MapPin,
-  Phone,
 } from "lucide-react";
 import { useOrders } from "@/hooks/useOrders";
 import { Order, OrderStatus, OrderItem } from "@/types/order";
 import { PageTransition, FadeIn } from "@/components/ui/motion";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -35,11 +32,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableSkeleton } from "@/components/ui/skeleton-card";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import Modal from "@/components/ui/modal";
 import { Clock, Truck, PackageCheck, Ban } from "lucide-react";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 
 // Order status badge styles
 const orderStatusStyles: Record<OrderStatus, string> = {
@@ -129,7 +127,7 @@ const OrderDetailsModal = ({
       onClose={onClose}
       title={`Order #${isLoading ? 'Loading...' : order?.orderNumber || 'Loading...'}`}
       description="View order details and items"
-      size="xl"
+      size="full"
     >
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
@@ -318,7 +316,7 @@ const OrderDetailsModal = ({
 };
 
 const OrdersPage = () => {
-  const { orders, isLoading, updateOrderStatus, downloadReceipt } = useOrders();
+  const { orders, isLoading, updateOrderStatus, downloadReceipt, pagination, refetch } = useOrders();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
   const { toast } = useToast();
@@ -331,6 +329,62 @@ const OrdersPage = () => {
   const [downloadingReceipt, setDownloadingReceipt] = useState<number | null>(
     null,
   );
+
+  // Track if this is the initial render to prevent duplicate fetches on mount
+  const isInitialRender = useRef(true);
+
+  // Debounce search input - 750ms delay for better UX during typing
+  useEffect(() => {
+    // Skip on initial render to prevent duplicate fetch
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      return;
+    }
+    
+    const timer = setTimeout(() => {
+      refetch({
+        page: 1, // Reset to first page when search changes
+        limit: pagination.limit,
+        // search: searchQuery,
+      });
+    }, 750);
+    return () => clearTimeout(timer);
+  }, [searchQuery, refetch, pagination.limit]);
+
+  // Refetch when status filter changes
+  useEffect(() => {
+    // Skip on initial render to prevent duplicate fetch
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      return;
+    }
+    
+    refetch({
+      page: 1, // Reset to first page when filter changes
+      limit: pagination.limit,
+      // search: searchQuery,
+    });
+  }, [statusFilter, refetch, pagination.limit, searchQuery]);
+
+  const goToPage = (pageNumber: number) => {
+    refetch({
+      page: pageNumber,
+      limit: pagination.limit,
+      // search: searchQuery,
+    });
+  };
+
+  const goToNextPage = () => {
+    if (pagination.hasNext) {
+      goToPage(pagination.page + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (pagination.hasPrevious) {
+      goToPage(pagination.page - 1);
+    }
+  };
 
   const filteredOrders = useMemo(() => {
     if (!Array.isArray(orders)) return [];
@@ -366,14 +420,15 @@ const OrdersPage = () => {
   }, [orders]);
 
   const handleStatusChange = async (
-    orderId: number,
+    order: Order,
     newStatus: OrderStatus,
   ) => {
     try {
-      await updateOrderStatus(orderId, { status: newStatus });
+      await updateOrderStatus(order.id, { status: newStatus });
+  
       toast({
         title: "Order status updated",
-        description: `Order #${orderId} status has been updated to ${orderStatusLabels[newStatus]}.`,
+        description: `Order #${order.orderNumber ?? order.id} status has been updated to ${orderStatusLabels[newStatus]}.`,
       });
     } catch (error) {
       toast({
@@ -566,7 +621,7 @@ const OrdersPage = () => {
 
         {/* Filters */}
         <FadeIn delay={0.1} className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1 max-w-md">
+          {/* <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search orders..."
@@ -574,7 +629,7 @@ const OrdersPage = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
-          </div>
+          </div> */}
           <Select
             value={statusFilter}
             onValueChange={(value) =>
@@ -595,156 +650,208 @@ const OrdersPage = () => {
           </Select>
         </FadeIn>
 
-        {/* Table */}
-        <FadeIn delay={0.2}>
-          {isLoading ? (
-            <TableSkeleton rows={5} />
-          ) : filteredOrders.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center justify-center py-16 text-center"
-            >
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-                <ShoppingCart className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-medium mb-2">No orders found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchQuery || statusFilter !== "all"
-                  ? "Try adjusting your filters"
-                  : "Orders will appear here when customers place them"}
-              </p>
-            </motion.div>
-          ) : (
-            <div className="border rounded-lg overflow-hidden bg-card shadow-card">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-white">
-                    <TableHead>Order ID</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Payment Method</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <AnimatePresence mode="popLayout">
-                    {filteredOrders.map((order, index) => (
-                      <motion.tr
-                        key={order.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="border-b last:border-0 hover:bg-muted/30 transition-colors"
-                      >
-                        <TableCell>
-                          <span className="font-medium">#{order.orderNumber}</span>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">
-                              {order.user
-                                ? order.user.email
-                                : order.guestUser
-                                  ? order.guestUser.name || order.guestUser.email
-                                  : "N/A"}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {order.user ? "Registered User" : "Guest User"}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={order.status}
-                            onValueChange={(value) =>
-                              handleStatusChange(order.id, value as OrderStatus)
-                            }
-                          >
-                            <SelectTrigger className="w-32 h-8">
-                              <SelectValue>
-                                <OrderStatusBadge status={order.status} />
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent className="bg-white">
-                              <SelectItem value={OrderStatus.PENDING}>
-                                <OrderStatusBadge
-                                  status={OrderStatus.PENDING}
-                                />
-                              </SelectItem>
-                              <SelectItem value={OrderStatus.PAID}>
-                                <OrderStatusBadge status={OrderStatus.PAID} />
-                              </SelectItem>
-                              <SelectItem value={OrderStatus.SHIPPED}>
-                                <OrderStatusBadge
-                                  status={OrderStatus.SHIPPED}
-                                />
-                              </SelectItem>
-                              <SelectItem value={OrderStatus.DELIVERED}>
-                                <OrderStatusBadge
-                                  status={OrderStatus.DELIVERED}
-                                />
-                              </SelectItem>
-                              <SelectItem value={OrderStatus.CANCELLED}>
-                                <OrderStatusBadge
-                                  status={OrderStatus.CANCELLED}
-                                />
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm">
-                            {order.paymentMethod.replace(/_/g, " ")}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-medium">
-                            {formatCurrency(order.total)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">
-                            {formatDate(order.createdAt)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDownloadReceipt(order.id)}
-                              disabled={downloadingReceipt === order.id}
-                              className="hover:bg-accent/10"
-                              title="Download Receipt"
-                            >
-                              {downloadingReceipt === order.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Download className="w-4 h-4" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleViewOrder(order)}
-                              className="hover:bg-accent/10"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </motion.tr>
-                    ))}
-                  </AnimatePresence>
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </FadeIn>
+         {/* Table */}
+         <FadeIn delay={0.2}>
+           {isLoading ? (
+             <TableSkeleton rows={5} />
+           ) : filteredOrders.length === 0 ? (
+             <motion.div
+               initial={{ opacity: 0, scale: 0.95 }}
+               animate={{ opacity: 1, scale: 1 }}
+               className="flex flex-col items-center justify-center py-16 text-center"
+             >
+               <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                 <ShoppingCart className="w-8 h-8 text-muted-foreground" />
+               </div>
+               <h3 className="text-lg font-medium mb-2">No orders found</h3>
+               <p className="text-muted-foreground mb-4">
+                 {searchQuery || statusFilter !== "all"
+                   ? "Try adjusting your filters"
+                   : "Orders will appear here when customers place them"}
+               </p>
+             </motion.div>
+           ) : (
+             <div className="border rounded-lg overflow-hidden bg-card shadow-card">
+               <Table>
+                 <TableHeader>
+                   <TableRow className="bg-white">
+                     <TableHead>Order ID</TableHead>
+                     <TableHead>Customer</TableHead>
+                     <TableHead>Status</TableHead>
+                     <TableHead>Payment Method</TableHead>
+                     <TableHead>Total</TableHead>
+                     <TableHead>Date</TableHead>
+                     <TableHead className="text-right">Actions</TableHead>
+                   </TableRow>
+                 </TableHeader>
+                 <TableBody>
+                   <AnimatePresence mode="popLayout">
+                     {filteredOrders.map((order, index) => (
+                       <motion.tr
+                         key={order.id}
+                         initial={{ opacity: 0, y: 20 }}
+                         animate={{ opacity: 1, y: 0 }}
+                         exit={{ opacity: 0, x: -20 }}
+                         transition={{ delay: index * 0.05 }}
+                         className="border-b last:border-0 hover:bg-muted/30 transition-colors"
+                       >
+                         <TableCell>
+                           <span className="font-medium">#{order.orderNumber}</span>
+                         </TableCell>
+                         <TableCell>
+                           <div>
+                             <p className="font-medium">
+                               {order.user
+                                 ? order.user.email
+                                 : order.guestUser
+                                   ? order.guestUser.name || order.guestUser.email
+                                   : "N/A"}
+                             </p>
+                             <p className="text-xs text-muted-foreground">
+                               {order.user ? "Registered User" : "Guest User"}
+                             </p>
+                           </div>
+                         </TableCell>
+                         <TableCell>
+                           <Select
+                             value={order.status}
+                             onValueChange={(value) =>
+                               handleStatusChange(order, value as OrderStatus)
+                             }
+                           >
+                             <SelectTrigger className="w-32 h-8">
+                               <SelectValue>
+                                 <OrderStatusBadge status={order.status} />
+                               </SelectValue>
+                             </SelectTrigger>
+                             <SelectContent className="bg-white">
+                               <SelectItem value={OrderStatus.PENDING}>
+                                 <OrderStatusBadge
+                                   status={OrderStatus.PENDING}
+                                 />
+                               </SelectItem>
+                               <SelectItem value={OrderStatus.PAID}>
+                                 <OrderStatusBadge status={OrderStatus.PAID} />
+                               </SelectItem>
+                               <SelectItem value={OrderStatus.SHIPPED}>
+                                 <OrderStatusBadge
+                                   status={OrderStatus.SHIPPED}
+                                 />
+                               </SelectItem>
+                               <SelectItem value={OrderStatus.DELIVERED}>
+                                 <OrderStatusBadge
+                                   status={OrderStatus.DELIVERED}
+                                 />
+                               </SelectItem>
+                               <SelectItem value={OrderStatus.CANCELLED}>
+                                 <OrderStatusBadge
+                                   status={OrderStatus.CANCELLED}
+                                 />
+                               </SelectItem>
+                             </SelectContent>
+                           </Select>
+                         </TableCell>
+                         <TableCell>
+                           <span className="text-sm">
+                             {order.paymentMethod.replace(/_/g, " ")}
+                           </span>
+                         </TableCell>
+                         <TableCell>
+                           <span className="font-medium">
+                             {formatCurrency(order.total)}
+                           </span>
+                         </TableCell>
+                         <TableCell>
+                           <span className="text-sm text-muted-foreground">
+                             {formatDate(order.createdAt)}
+                           </span>
+                         </TableCell>
+                         <TableCell className="text-right">
+                           <div className="flex items-center justify-end gap-1">
+                             <Button
+                               variant="ghost"
+                               size="icon"
+                               onClick={() => handleDownloadReceipt(order.id)}
+                               disabled={downloadingReceipt === order.id}
+                               className="hover:bg-accent/10"
+                               title="Download Receipt"
+                             >
+                               {downloadingReceipt === order.id ? (
+                                 <Loader2 className="w-4 h-4 animate-spin" />
+                               ) : (
+                                 <Download className="w-4 h-4" />
+                               )}
+                             </Button>
+                             <Button
+                               variant="ghost"
+                               size="icon"
+                               onClick={() => handleViewOrder(order)}
+                               className="hover:bg-accent/10"
+                             >
+                               <Eye className="w-4 h-4" />
+                             </Button>
+                           </div>
+                         </TableCell>
+                       </motion.tr>
+                     ))}
+                   </AnimatePresence>
+                 </TableBody>
+               </Table>
+
+               {/* Pagination */}
+               {pagination.totalPages > 0 && (
+                 <div className="flex items-center justify-between px-4 py-4 border-t bg-muted/20">
+                   <div className="text-sm text-muted-foreground">
+                     Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+                     {Math.min(
+                       pagination.page * pagination.limit,
+                       pagination.total,
+                     )}{" "}
+                     of {pagination.total} orders
+                   </div>
+                   <Pagination>
+                     <PaginationContent>
+                       <PaginationItem>
+                         <PaginationPrevious
+                           onClick={goToPreviousPage}
+                           className={
+                             !pagination.hasPrevious
+                               ? "pointer-events-none opacity-50"
+                               : "cursor-pointer"
+                           }
+                         />
+                       </PaginationItem>
+                       {Array.from(
+                         { length: pagination.totalPages },
+                         (_, i) => i + 1,
+                       ).map((page) => (
+                         <PaginationItem key={page}>
+                           <PaginationLink
+                             onClick={() => goToPage(page)}
+                             isActive={pagination.page === page}
+                             className="cursor-pointer"
+                           >
+                             {page}
+                           </PaginationLink>
+                         </PaginationItem>
+                       ))}
+                       <PaginationItem>
+                         <PaginationNext
+                           onClick={goToNextPage}
+                           className={
+                             !pagination.hasNext
+                               ? "pointer-events-none opacity-50"
+                               : "cursor-pointer"
+                           }
+                         />
+                       </PaginationItem>
+                     </PaginationContent>
+                   </Pagination>
+                 </div>
+               )}
+             </div>
+           )}
+         </FadeIn>
       </div>
 
       {/* Order Details Modal */}

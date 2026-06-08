@@ -42,16 +42,16 @@ export const AdminNavbar = () => {
     <motion.header
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="h-16 bg-card border-b border-border flex items-center justify-between px-6 sticky top-0 z-30"
+      className="h-16 bg-card border-b border-border flex items-center justify-end px-6 sticky top-0 z-30"
     >
       {/* Search */}
-      <div className="relative max-w-md w-full">
+      {/* <div className="relative max-w-md w-full">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
           placeholder="Search products, orders..."
           className="pl-10 bg-background border-border"
         />
-      </div>
+      </div> */}
 
       {/* Right Section */}
       <div className="flex items-center gap-2">
