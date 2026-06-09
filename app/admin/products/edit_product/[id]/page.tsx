@@ -280,7 +280,9 @@ export default function EditProductPage() {
         setValue(
           "images",
           filtered.map((img, i) => ({
+            id: img.id,
             url: img.url,
+            publicId: img.publicId,
             altText: img.altText || "",
             position: i,
           }))
@@ -297,7 +299,9 @@ export default function EditProductPage() {
         setValue(
           "images",
           filtered.map((img, i) => ({
+            id: img.id,
             url: img.url,
+            publicId: img.publicId,
             altText: img.altText || "",
             position: i,
           }))
