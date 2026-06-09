@@ -16,7 +16,9 @@
  *   refetch,
  *   createAttribute,
  *   updateAttribute,
- *   deleteAttribute
+ *   deleteAttribute,
+ *   restoreAttribute,
+ *   getAttributeById
  * } = useAttributes();
  * ```
  */
@@ -41,8 +43,10 @@ interface UseAttributesReturn {
   createAttribute: (data: CreateAttributeInput) => Promise<Attribute>;
   /** Function to update an existing attribute */
   updateAttribute: (id: number, data: UpdateAttributeInput) => Promise<Attribute>;
-  /** Function to delete an attribute */
+  /** Function to soft delete an attribute */
   deleteAttribute: (id: number) => Promise<void>;
+  /** Function to restore a soft-deleted attribute */
+  restoreAttribute: (id: number) => Promise<Attribute>;
   /** Function to get a single attribute by ID */
   getAttributeById: (id: number) => Promise<Attribute>;
 }
@@ -121,17 +125,48 @@ export const useAttributes = (): UseAttributesReturn => {
   };
 
   /**
-   * Deletes an attribute
+   * Soft deletes an attribute
    * @param id - The attribute ID to delete
    */
   const deleteAttribute = async (id: number): Promise<void> => {
     setError(null);
     try {
       await attributesApi.delete(id);
-      setAttributes((prev) => prev?.filter((a) => a.id !== id));
+      // For soft delete, mark as deleted in local state
+      setAttributes((prev) =>
+        prev.map((a) =>
+          a.id === id
+            ? { ...a, isDeleted: true, deletedAt: new Date().toISOString() }
+            : a
+        )
+      );
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
       setError(error?.response?.data?.message || "Failed to delete attribute");
+      throw err;
+    }
+  };
+
+  /**
+   * Restores a soft-deleted attribute
+   * @param id - The attribute ID to restore
+   * @returns The restored attribute
+   */
+  const restoreAttribute = async (id: number): Promise<Attribute> => {
+    setError(null);
+    try {
+      const restored = await attributesApi.restore(id);
+      setAttributes((prev) =>
+        prev.map((a) =>
+          a.id === id
+            ? { ...restored, isDeleted: false, deletedAt: null }
+            : a
+        )
+      );
+      return restored;
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error?.response?.data?.message || "Failed to restore attribute");
       throw err;
     }
   };
@@ -157,6 +192,7 @@ export const useAttributes = (): UseAttributesReturn => {
     createAttribute,
     updateAttribute,
     deleteAttribute,
+    restoreAttribute,
     getAttributeById,
   };
 };

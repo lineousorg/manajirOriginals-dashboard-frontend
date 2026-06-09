@@ -1,3 +1,5 @@
+import { CategoryAttribute } from "./attribute";
+
 export interface CategoryImage {
   url: string;
   altText: string;
@@ -18,6 +20,8 @@ export interface Category {
   _count: {
     products: number;
   };
+  /** Attributes assigned to this category (optional, fetched separately) */
+  categoryAttributes?: CategoryAttribute[];
 }
 
 export interface CreateCategoryInput {
