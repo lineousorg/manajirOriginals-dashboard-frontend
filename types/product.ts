@@ -1,4 +1,6 @@
 // Product category interface (nested in Product)
+import { ApplicableAttribute } from "./attribute";
+
 export interface ProductCategory {
   id: number;
   name: string;
@@ -39,6 +41,8 @@ export interface ProductVariant {
   deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  // Unique key generated from attribute combination for duplicate detection
+  combinationKey: string | null;
   // Discount fields
   discountType?: "PERCENTAGE" | "FIXED" | null;
   discountValue?: number | null;
@@ -61,6 +65,8 @@ export interface Product {
   category: ProductCategory;
   variants: ProductVariant[];
   images?: ProductImage[];
+  /** Attributes applicable to this product's category with value restriction rules */
+  applicableAttributes?: ApplicableAttribute[];
   createdAt: string;
   updatedAt: string;
 }

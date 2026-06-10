@@ -17,6 +17,7 @@
  *   createAttributeValue,
  *   updateAttributeValue,
  *   deleteAttributeValue,
+ *   restoreAttributeValue,
  *   getValuesByAttributeId
  * } = useAttributeValues();
  * ```
@@ -42,8 +43,10 @@ interface UseAttributeValuesReturn {
   createAttributeValue: (data: CreateAttributeValueInput) => Promise<AttributeValue>;
   /** Function to update an existing attribute value */
   updateAttributeValue: (id: number, data: UpdateAttributeValueInput) => Promise<AttributeValue>;
-  /** Function to delete an attribute value */
+  /** Function to soft delete an attribute value */
   deleteAttributeValue: (id: number) => Promise<void>;
+  /** Function to restore a soft-deleted attribute value */
+  restoreAttributeValue: (id: number) => Promise<AttributeValue>;
   /** Function to get values for a specific attribute */
   getValuesByAttributeId: (attributeId: number) => Promise<AttributeValue[]>;
 }
@@ -126,17 +129,48 @@ export const useAttributeValues = (): UseAttributeValuesReturn => {
   };
 
   /**
-   * Deletes an attribute value
+   * Soft deletes an attribute value
    * @param id - The attribute value ID to delete
    */
   const deleteAttributeValue = async (id: number): Promise<void> => {
     setError(null);
     try {
       await attributeValuesApi.delete(id);
-      setAttributeValues((prev) => prev?.filter((av) => av.id !== id));
+      // For soft delete, mark as deleted in local state
+      setAttributeValues((prev) =>
+        prev.map((av) =>
+          av.id === id
+            ? { ...av, isDeleted: true, deletedAt: new Date().toISOString() }
+            : av
+        )
+      );
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
       setError(error?.response?.data?.message || "Failed to delete attribute value");
+      throw err;
+    }
+  };
+
+  /**
+   * Restores a soft-deleted attribute value
+   * @param id - The attribute value ID to restore
+   * @returns The restored attribute value
+   */
+  const restoreAttributeValue = async (id: number): Promise<AttributeValue> => {
+    setError(null);
+    try {
+      const restored = await attributeValuesApi.restore(id);
+      setAttributeValues((prev) =>
+        prev.map((av) =>
+          av.id === id
+            ? { ...restored, isDeleted: false, deletedAt: null }
+            : av
+        )
+      );
+      return restored;
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error?.response?.data?.message || "Failed to restore attribute value");
       throw err;
     }
   };
@@ -162,6 +196,7 @@ export const useAttributeValues = (): UseAttributeValuesReturn => {
     createAttributeValue,
     updateAttributeValue,
     deleteAttributeValue,
+    restoreAttributeValue,
     getValuesByAttributeId,
   };
 };

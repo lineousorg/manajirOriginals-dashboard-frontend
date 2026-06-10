@@ -11,9 +11,12 @@ import {
   ChevronDown,
   ChevronUp,
   List,
+  FolderTree,
 } from "lucide-react";
 import { useAttributes } from "@/hooks/useAttributes";
 import { useAttributeValues } from "@/hooks/useAttributeValues";
+import { useCategories } from "@/hooks/useCategories";
+import { useCategoryAttributes } from "@/hooks/useCategoryAttributes";
 import { PageTransition, FadeIn } from "@/components/ui/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,8 +54,18 @@ import {
 import { Label } from "@/components/ui/label";
 import { TableSkeleton } from "@/components/ui/skeleton-card";
 import { useToast } from "@/hooks/use-toast";
+import { CategoryAttribute } from "@/types/attribute";
 import { CreateAttributeInput, Attribute } from "@/types/attribute";
 import Link from "next/link";
+import AttributeSelectionTable from "@/components/attribute/AttributeSelectionTable";
+
+// Type for the mapped category info displayed in the UI
+type CategoryAttrInfo = {
+  categoryId: number;
+  name: string;
+  isVariantSelectable: boolean;
+  isRequired: boolean;
+};
 
 const AttributesPage = () => {
   const {
@@ -61,32 +74,98 @@ const AttributesPage = () => {
     createAttribute,
     updateAttribute,
     deleteAttribute,
+    restoreAttribute,
   } = useAttributes();
-  const { attributeValues, refetch: refetchAttributeValues } = useAttributeValues();
+  const { attributeValues, refetch: refetchAttributeValues } =
+    useAttributeValues();
+  const { categories } = useCategories();
+  const { fetchCategoryAttributes } = useCategoryAttributes();
   const [searchQuery, setSearchQuery] = useState("");
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newAttributeName, setNewAttributeName] = useState("");
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editingAttribute, setEditingAttribute] = useState<Attribute | null>(null);
+  const [editingAttribute, setEditingAttribute] = useState<Attribute | null>(
+    null
+  );
   const [editAttributeName, setEditAttributeName] = useState("");
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [attributeToDelete, setAttributeToDelete] = useState<number | null>(null);
+  const [attributeToDelete, setAttributeToDelete] = useState<number | null>(
+    null
+  );
 
-  const [expandedAttribute, setExpandedAttribute] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+  // Track category attributes per attribute for expanded view
+  const [attrCategoryMap, setAttrCategoryMap] = useState<
+    Record<number, CategoryAttrInfo[]>
+  >({});
 
   const { toast } = useToast();
 
   // Filter attributes based on search
-  const filteredAttributes = attributes?.filter((attribute) =>
-    attribute.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredAttributes =
+    attributes?.filter((attribute) =>
+      attribute.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ) || [];
 
-  // Helper to get values for a specific attribute
-  const getValuesForAttribute = (attributeId: number) => {
-    return attributeValues?.filter((av) => av.attributeId === attributeId);
+  // Fetch category-attribute relationships when expanding an attribute
+  const handleExpandAttribute = async (attributeId: number) => {
+    // If we already have data for this attribute, don't refetch
+    if (attrCategoryMap[attributeId]) return;
+
+    const allCategories = categories || [];
+    const results: CategoryAttrInfo[] = [];
+
+    try {
+       for (const cat of allCategories) {
+         try {
+           const catAttrs: CategoryAttribute[] = await fetchCategoryAttributes(
+             cat.slug
+           );
+          const matching = catAttrs.filter(
+            (ca: CategoryAttribute) => ca.attributeId === attributeId
+          );
+          if (matching.length > 0) {
+            results.push({
+              categoryId: cat.id,
+              name: cat.name,
+              isVariantSelectable: matching[0].isVariantSelectable,
+              isRequired: matching[0].isRequired,
+            });
+          }
+        } catch {
+          // Skip categories that fail to fetch
+        }
+      }
+
+      setAttrCategoryMap((prev) => ({ ...prev, [attributeId]: results }));
+    } catch {
+      // Fallback: try to use existing categoryAttributes from categories if available
+      const fallback: CategoryAttrInfo[] = [];
+      allCategories.forEach((cat) => {
+        const matching: CategoryAttribute[] =
+          cat.categoryAttributes?.filter(
+            (ca: CategoryAttribute) => ca.attributeId === attributeId
+          ) || [];
+        matching.forEach((ca: CategoryAttribute) => {
+          fallback.push({
+            categoryId: cat.id,
+            name: cat.name,
+            isVariantSelectable: ca.isVariantSelectable,
+            isRequired: ca.isRequired,
+          });
+        });
+      });
+      setAttrCategoryMap((prev) => ({ ...prev, [attributeId]: fallback }));
+    }
+  };
+
+  const handleToggleExpand = (_id: number) => {
+    // Expand is handled internally by AttributeSelectionTable
+    // This is kept for potential future use
   };
 
   const handleCreateAttribute = async () => {
@@ -182,8 +261,20 @@ const AttributesPage = () => {
     }
   };
 
-  const toggleExpand = (id: number) => {
-    setExpandedAttribute(expandedAttribute === id ? null : id);
+  const handleRestore = async (id: number) => {
+    try {
+      await restoreAttribute(id);
+      toast({
+        title: "Attribute restored",
+        description: "Attribute has been restored successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to restore attribute. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -226,124 +317,20 @@ const AttributesPage = () => {
           {isLoading ? (
             <TableSkeleton />
           ) : (
-            <div className="border rounded-lg overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12"></TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Values Count</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredAttributes.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8">
-                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                          <Tag className="w-8 h-8" />
-                          <p>No attributes found</p>
-                          <Button
-                            variant="link"
-                            onClick={() => setCreateDialogOpen(true)}
-                          >
-                            Create your first attribute
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredAttributes.map((attribute) => (
-                      <>
-                        <TableRow>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => toggleExpand(attribute.id)}
-                              className="p-0 hover:bg-transparent"
-                            >
-                              {expandedAttribute === attribute.id ? (
-                                <ChevronUp className="w-4 h-4" />
-                              ) : (
-                                <ChevronDown className="w-4 h-4" />
-                              )}
-                            </Button>
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {attribute.name}
-                          </TableCell>
-                          <TableCell>
-                            {getValuesForAttribute(attribute.id).length} values
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => handleEditClick(attribute)}
-                                >
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleDeleteClick(attribute.id)}
-                                  className="text-destructive"
-                                >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                        {expandedAttribute === attribute.id && (
-                          <TableRow key={`${attribute.id}-expanded`}>
-                            <TableCell colSpan={4} className="bg-muted/30">
-                              <div className="py-2">
-                                <div className="flex items-center justify-between mb-3">
-                                  <h4 className="text-sm font-medium">
-                                    Values for &quot;{attribute.name}&quot;
-                                  </h4>
-                                  <Link href={`/admin/attribute-values?attributeId=${attribute.id}`}>
-                                    <Button variant="outline" size="sm">
-                                      <List className="w-4 h-4 mr-2" />
-                                      Manage Values
-                                    </Button>
-                                  </Link>
-                                </div>
-                                {getValuesForAttribute(attribute.id).length > 0 ? (
-                                  <div className="flex flex-wrap gap-2">
-                                    {getValuesForAttribute(attribute.id).map((value) => (
-                                      <span
-                                        key={value.id}
-                                        className="px-3 py-1 bg-gray-300 text-secondary-foreground rounded-full text-sm"
-                                      >
-                                        {value.value}
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <p className="text-sm text-muted-foreground">
-                                    No values defined yet
-                                  </p>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </>
-                    ))
-                  )}
-
-
-                </TableBody>
-              </Table>
-            </div>
+            <AttributeSelectionTable
+               attributes={filteredAttributes}
+               attributeValues={attributeValues}
+               attrCategoryMap={attrCategoryMap}
+               selectedAttributeIds={selectedIds}
+               onSelect={setSelectedIds}
+              //  onEdit={handleEditClick}
+               onDelete={handleDeleteClick}
+               onRestore={handleRestore}
+               onExpand={handleExpandAttribute}
+               onCreate={() => setCreateDialogOpen(true)}
+               searchQuery={searchQuery}
+               mode="page"
+             />
           )}
         </FadeIn>
 
@@ -361,7 +348,9 @@ const AttributesPage = () => {
                   placeholder="e.g., Color, Size, Material"
                   value={newAttributeName}
                   onChange={(e) => setNewAttributeName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleCreateAttribute()}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && handleCreateAttribute()
+                  }
                 />
               </div>
             </div>
@@ -375,7 +364,7 @@ const AttributesPage = () => {
               <Button onClick={handleCreateAttribute}>Create</Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog> 
+        </Dialog>
 
         {/* Edit Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>

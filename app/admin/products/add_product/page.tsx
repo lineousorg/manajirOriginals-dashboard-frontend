@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useFieldArray, useForm, Controller, useWatch } from "react-hook-form";
@@ -10,6 +11,7 @@ import { useProducts } from "@/hooks/useProducts";
 import { useCategories } from "@/hooks/useCategories";
 import { useAttributes } from "@/hooks/useAttributes";
 import { useAttributeValues } from "@/hooks/useAttributeValues";
+import { useCategoryAttributes } from "@/hooks/useCategoryAttributes";
 import { PageTransition, FadeIn } from "@/components/ui/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,107 +40,139 @@ const attributeSchema = z.object({
 // Image schema
 const imageSchema = z.object({
   url: z.string().min(1, "Image URL is required"),
-  publicId: z.string().optional(), // Cloudinary public ID for deletion
+  publicId: z.string().optional(),
   altText: z.string().optional().default(""),
   position: z.number(),
 });
 
 // Variant schema matching backend structure
-const today = new Date().toISOString().split('T')[0];
+const today = new Date().toISOString().split("T")[0];
 
-const variantSchema = z.object({
-  sku: z.string().min(1, "SKU is required"),
-  price: z.number().min(0.01, "Price must be greater than 0"),
-  stock: z.number().min(1, "Stock must be at least 1"),
-  attributes: z.array(attributeSchema).min(1, "At least one attribute value is required").optional().default([]),
-  // Discount fields
-  discountType: z.enum(["PERCENTAGE", "FIXED"]).optional().nullable(),
-  discountValue: z.number().min(0).optional().nullable(),
-  discountStart: z.string().refine(
-    (val) => !val || val >= today,
-    { message: "Can't select past day" }
-  ).optional().nullable(),
-  discountEnd: z.string().refine(
-    (val) => !val || val >= today,
-    { message: "Can't select past day" }
-  ).optional().nullable(),
-}).superRefine((data, ctx) => {
-  // Conditional validation: only enforce max 100 for percentage discounts
-  if (data.discountType === "PERCENTAGE" && data.discountValue !== null && data.discountValue !== undefined && data.discountValue > 100) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Percentage cannot exceed 100",
-      path: ["discountValue"],
-    });
-  }
-});
+const variantSchema = z
+  .object({
+    sku: z.string().min(1, "SKU is required"),
+    price: z.number().min(0, "Price must be positive"),
+    stock: z.number().min(0, "Stock must be positive"),
+    attributes: z.array(attributeSchema).optional().default([]),
+    discountType: z.enum(["PERCENTAGE", "FIXED"]).optional().nullable(),
+    discountValue: z.number().min(0).optional().nullable(),
+    discountStart: z
+      .string()
+      .refine((val) => !val || val >= today, {
+        message: "Can't select past day",
+      })
+      .optional()
+      .nullable(),
+    discountEnd: z
+      .string()
+      .refine((val) => !val || val >= today, {
+        message: "Can't select past day",
+      })
+      .optional()
+      .nullable(),
+  })
+  .superRefine((data, ctx) => {
+    if (
+      data.discountType === "PERCENTAGE" &&
+      data.discountValue !== null &&
+      data.discountValue !== undefined &&
+      data.discountValue > 100
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Percentage cannot exceed 100",
+        path: ["discountValue"],
+      });
+    }
+  });
 
 // Product schema matching backend structure
-const productSchema = z.object({
-  name: z.string().min(1, "Name is required").max(100),
-  description: z.string().min(1, "Description is required").max(500),
-  productDetailsHtml: z.string().optional(),
-  slug: z.string().min(1, "Slug is required").max(100),
-  categoryId: z.number().min(1, "Category is required"),
-  variants: z.array(variantSchema).min(1, "At least one variant is required").superRefine((variants, ctx) => {
-    // Check for duplicate variants based on attributes
-    const attributeSignatureMap = new Map<string, number[]>();
+const productSchema = z
+  .object({
+    name: z.string().min(1, "Name is required").max(100),
+    description: z.string().min(1, "Description is required").max(500),
+    productDetailsHtml: z.string().optional(),
+    slug: z.string().min(1, "Slug is required").max(100),
+    categoryId: z.number().min(1, "Category is required"),
+    variants: z
+      .array(variantSchema)
+      .min(1, "At least one variant is required")
+      .superRefine((variants, ctx) => {
+        const attributeSignatureMap = new Map<string, number[]>();
 
-    variants.forEach((variant, index) => {
-      // Create a unique signature for the variant's attributes
-      // Sort by attributeId to ensure consistent ordering
-      const sortedAttrs = [...(variant.attributes || [])].sort(
-        (a, b) => a.attributeId - b.attributeId
-      );
-      const signature = sortedAttrs
-        .map((attr) => `${attr.attributeId}:${attr.valueId}`)
-        .join(";");
+        variants.forEach((variant, index) => {
+          const sortedAttrs = [...(variant.attributes || [])].sort(
+            (a, b) => a.attributeId - b.attributeId
+          );
+          const signature = sortedAttrs
+            .map((attr) => `${attr.attributeId}:${attr.valueId}`)
+            .join(";");
 
-      if (!signature) return; // Skip variants with no attributes
+          if (!signature) return;
 
-      if (attributeSignatureMap.has(signature)) {
-        attributeSignatureMap.get(signature)!.push(index);
-      } else {
-        attributeSignatureMap.set(signature, [index]);
-      }
-    });
-
-    // Add errors for duplicate variants
-    attributeSignatureMap.forEach((indices) => {
-      if (indices.length > 1) {
-        // All indices except the first one are considered duplicates
-        indices.slice(1).forEach((dupIndex) => {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "That variant already exists. Cannot create the same variant twice.",
-            path: [dupIndex, "attributes"],
-          });
+          if (attributeSignatureMap.has(signature)) {
+            attributeSignatureMap.get(signature)!.push(index);
+          } else {
+            attributeSignatureMap.set(signature, [index]);
+          }
         });
-      }
-    });
-  }),
-  images: z.array(imageSchema).optional().default([]),
-});
+
+        attributeSignatureMap.forEach((indices) => {
+          if (indices.length > 1) {
+            indices.slice(1).forEach((dupIndex) => {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message:
+                  "That variant already exists. Cannot create the same variant twice.",
+                path: [dupIndex, "attributes"],
+              });
+            });
+          }
+        });
+      }),
+    images: z.array(imageSchema).optional().default([]),
+  })
+  .superRefine((data, ctx) => {
+    // Validate that variant attributes belong to the selected category
+    // (Server-side validation is the primary guard)
+  });
 
 type ProductFormData = z.infer<typeof productSchema>;
+
+// SKU generation ref type
+type SkuRefEntry = {
+  index: number;
+  attributes: Array<{ attributeId: number; valueId: number }>;
+};
 
 const CreateProductPage = () => {
   const router = useRouter();
   const { createProduct } = useProducts();
   const { categories, isLoading: isLoadingCategories } = useCategories();
   const { attributes, isLoading: isLoadingAttributes } = useAttributes();
-  const { attributeValues, isLoading: isLoadingAttributeValues } = useAttributeValues();
+  const { attributeValues, isLoading: isLoadingAttributeValues } =
+    useAttributeValues();
+  const { fetchCategoryAttributes } = useCategoryAttributes();
   const { toast } = useToast();
 
-   const {
-     register,
-     control,
-     handleSubmit,
-     watch,
-     setValue,
-     setError,
-     formState: { errors, isSubmitting },
-   } = useForm<ProductFormData>({
+  // Track selected category to filter attributes
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
+    null
+  );
+  const [categoryAttributesMap, setCategoryAttributesMap] = useState<
+    Record<number, number[]>
+  >({});
+  const [isFetchingCategoryAttrs, setIsFetchingCategoryAttrs] = useState(false);
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: {
       name: "",
@@ -146,31 +180,24 @@ const CreateProductPage = () => {
       productDetailsHtml: "",
       slug: "",
       categoryId: 0,
-      variants: [{ 
-        sku: "", 
-        price: 0, 
-        stock: 0, 
-        attributes: [],
-        discountType: null,
-        discountValue: null,
-        discountStart: null,
-        discountEnd: null,
-      }],
+      variants: [
+        {
+          sku: "",
+          price: 0,
+          stock: 0,
+          attributes: [],
+          discountType: null,
+          discountValue: null,
+          discountStart: null,
+          discountEnd: null,
+        },
+      ],
       images: [],
     },
   });
 
   // Store generated SKUs before product creation
-  const generatedSKUsRef = useRef<
-    Array<{
-      index: number;
-      attributes: Array<{ attributeId: number; valueId: number }>;
-    }>
-  >([]);
-  
-  // Refs for scrolling to error sections
-  const variantCardRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const basicInfoRef = useRef<HTMLDivElement>(null);
+  const generatedSKUsRef = useRef<SkuRefEntry[]>([]);
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -187,11 +214,13 @@ const CreateProductPage = () => {
   });
 
   // Track uploading images with local preview URLs
-  const [uploadingImages, setUploadingImages] = useState<Array<{
-    index: number;
-    localUrl: string;
-    fileName: string;
-  }>>([]);
+  const [uploadingImages, setUploadingImages] = useState<
+    Array<{
+      index: number;
+      localUrl: string;
+      fileName: string;
+    }>
+  >([]);
 
   // Handle image file selection - upload to Cloudinary
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -205,12 +234,11 @@ const CreateProductPage = () => {
       fileName: string;
     }> = [];
 
-    // Create local previews for all files immediately
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const imageIndex = currentImages.length + i;
       const localUrl = URL.createObjectURL(file);
-      
+
       newUploadingImages.push({
         index: imageIndex,
         localUrl,
@@ -218,29 +246,23 @@ const CreateProductPage = () => {
       });
     }
 
-    // Add all to uploading state immediately (instant UI feedback)
-    setUploadingImages(prev => [...prev, ...newUploadingImages]);
+    setUploadingImages((prev) => [...prev, ...newUploadingImages]);
 
-    // Upload each image
     for (const upload of newUploadingImages) {
       try {
         const file = files[upload.index - currentImages.length];
-        
-        // Upload to Cloudinary
         const cloudinaryResponse = await uploadToCloudinary(file);
-        
-        // Add to form with publicId for Cloudinary deletion
+
         appendImage({
           url: cloudinaryResponse.secure_url,
           publicId: cloudinaryResponse.public_id,
           altText: upload.fileName,
           position: upload.index,
         });
-        
-        // Remove from uploading state
-        setUploadingImages(prev => prev.filter(u => u.index !== upload.index));
-        
-        // Clean up object URL
+
+        setUploadingImages((prev) =>
+          prev.filter((u) => u.index !== upload.index)
+        );
         URL.revokeObjectURL(upload.localUrl);
       } catch (error) {
         console.error("Error uploading image to Cloudinary:", error);
@@ -249,13 +271,13 @@ const CreateProductPage = () => {
           description: `Failed to upload ${upload.fileName}. Please try again.`,
           variant: "destructive",
         });
-        // Remove from uploading state (failed)
-        setUploadingImages(prev => prev.filter(u => u.index !== upload.index));
+        setUploadingImages((prev) =>
+          prev.filter((u) => u.index !== upload.index)
+        );
         URL.revokeObjectURL(upload.localUrl);
       }
     }
-    
-    // Reset the input
+
     e.target.value = "";
   };
 
@@ -269,13 +291,16 @@ const CreateProductPage = () => {
   useEffect(() => {
     if (variantsValue && variantsValue.length > 0) {
       variantsValue.forEach((variant, index) => {
-        const newSku = generateSKU(nameValue, variant.attributes || [], attributeValues, index);
-        // Only update if SKU has changed
+        const newSku = generateSKU(
+          nameValue,
+          variant.attributes || [],
+          attributeValues,
+          index
+        );
         if (previousSkusRef.current[index] !== newSku) {
           setValue(`variants.${index}.sku`, newSku);
           previousSkusRef.current[index] = newSku;
         }
-        // Store the variant data for SKU regeneration after product creation
         generatedSKUsRef.current[index] = {
           index,
           attributes: variant.attributes || [],
@@ -291,6 +316,83 @@ const CreateProductPage = () => {
       .replace(/^-|-$/g, "");
     setValue("slug", slug);
   };
+
+  const categoryIdValue = watch("categoryId");
+
+  // Fetch category attributes when category changes
+  useEffect(() => {
+    const fetchAttrs = async (catId: number) => {
+      if (catId <= 0) {
+        setCategoryAttributesMap((prev) => ({ ...prev, [catId]: [] }));
+        return;
+      }
+      setIsFetchingCategoryAttrs(true);
+      try {
+        const catAttrs = await fetchCategoryAttributes(catId);
+        const attrIds = catAttrs.map((ca) => ca.attributeId);
+        setCategoryAttributesMap((prev) => ({ ...prev, [catId]: attrIds }));
+      } catch {
+        setCategoryAttributesMap((prev) => ({ ...prev, [catId]: [] }));
+      } finally {
+        setIsFetchingCategoryAttrs(false);
+      }
+    };
+
+    if (categoryIdValue > 0) {
+      setSelectedCategoryId(categoryIdValue);
+      if (!categoryAttributesMap[categoryIdValue]) {
+        fetchAttrs(categoryIdValue);
+      }
+    } else {
+      setSelectedCategoryId(null);
+    }
+  }, [categoryIdValue, fetchCategoryAttributes]);
+
+  // Get attribute IDs that belong to the selected category
+  const getCategoryAttributeIds = useCallback(
+    (catId: number | null): number[] => {
+      if (!catId || catId <= 0) return attributes.map((a) => a.id);
+      return categoryAttributesMap[catId] || attributes.map((a) => a.id);
+    },
+    [attributes, categoryAttributesMap]
+  );
+
+  // Filter attributes based on selected category
+  const filteredAttributes = attributes.filter((attr) => {
+    if (!selectedCategoryId || selectedCategoryId <= 0) return true;
+    const catAttrIds = getCategoryAttributeIds(selectedCategoryId);
+    return catAttrIds.includes(attr.id);
+  });
+
+  // Filter attribute values based on filtered attributes
+  const filteredAttributeValues = attributeValues.filter((av) => {
+    if (!selectedCategoryId || selectedCategoryId <= 0) return true;
+    const catAttrIds = getCategoryAttributeIds(selectedCategoryId);
+    return catAttrIds.includes(av.attributeId);
+  });
+
+  // Reset variant attributes when category changes
+  const handleCategoryChange = useCallback(
+    (newCategoryId: number) => {
+      setSelectedCategoryId(newCategoryId);
+      const currentVariants = watch("variants") || [];
+      const newVariants = currentVariants.map((variant) => ({
+        ...variant,
+        attributes: (variant.attributes || []).filter(
+          (va) =>
+            !selectedCategoryId ||
+            selectedCategoryId <= 0 ||
+            (categoryAttributesMap[newCategoryId] || []).includes(
+              va.attributeId
+            )
+        ),
+      }));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setValue("variants", newVariants, { shouldValidate: false });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [watch, setValue, selectedCategoryId, categoryAttributesMap]
+  );
 
   // Function to scroll to the first error in the form
   const scrollToFirstError = useCallback(() => {
@@ -326,13 +428,16 @@ const CreateProductPage = () => {
           price: v.price,
           stock: v.stock,
           attributes: v.attributes || [],
-          // Include discount fields if they exist
-          ...(v.discountType && v.discountValue !== null && v.discountValue !== undefined && {
-            discountType: v.discountType,
-            discountValue: v.discountValue,
-            discountStart: v.discountStart || undefined,
-            discountEnd: v.discountEnd || undefined,
-          }),
+          ...(v.discountType &&
+          v.discountValue !== null &&
+          v.discountValue !== undefined
+            ? {
+                discountType: v.discountType,
+                discountValue: v.discountValue,
+                discountStart: v.discountStart || undefined,
+                discountEnd: v.discountEnd || undefined,
+              }
+            : {}),
         })),
         images: data.images.map((img, index) => ({
           url: img.url,
@@ -342,13 +447,7 @@ const CreateProductPage = () => {
         })),
       };
 
-      // console.log(productData);
-
-      // Create product and get the response with productId
       const createdProduct = await createProduct(productData);
-
-      // Note: SKUs are already generated client-side during form input
-      // and included in the initial POST request, so no additional PATCH is needed
 
       toast({
         title: "Product created",
@@ -358,7 +457,6 @@ const CreateProductPage = () => {
     } catch (error: any) {
       console.error("Error creating product:", error);
 
-      // Check for 409 Conflict (duplicate slug)
       if (error?.response?.status === 409) {
         toast({
           title: "Slug Already Exists",
@@ -377,8 +475,6 @@ const CreateProductPage = () => {
       }
     }
   };
-
-  // Remove mock attributes and use real data from API
 
   return (
     <PageTransition>
@@ -434,7 +530,10 @@ const CreateProductPage = () => {
                       render={({ field }) => (
                         <Select
                           value={String(field.value)}
-                          onValueChange={(val) => field.onChange(Number(val))}
+                          onValueChange={(val) => {
+                            field.onChange(Number(val));
+                            handleCategoryChange(Number(val));
+                          }}
                           disabled={isLoadingCategories}
                         >
                           <SelectTrigger
@@ -533,16 +632,17 @@ const CreateProductPage = () => {
 
                     {imageFields.length === 0 && (
                       <p className="text-muted-foreground text-sm">
-                        No images added yet. Click &quot;Add Images&quot; to
-                        upload.
+                        No images added yet. Click Add Images to upload.
                       </p>
                     )}
 
                     <div className="grid gap-4 md:grid-cols-3">
                       {imageFields.map((field, index) => {
-                        const uploadingInfo = uploadingImages.find(u => u.index === index);
+                        const uploadingInfo = uploadingImages.find(
+                          (u) => u.index === index
+                        );
                         const isUploading = !!uploadingInfo;
-                        
+
                         return (
                           <motion.div
                             key={field.id}
@@ -618,10 +718,10 @@ const CreateProductPage = () => {
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    append({ 
-                      sku: "", 
-                      price: 0, 
-                      stock: 0, 
+                    append({
+                      sku: "",
+                      price: 0,
+                      stock: 0,
                       attributes: [],
                       discountType: null,
                       discountValue: null,
@@ -641,6 +741,18 @@ const CreateProductPage = () => {
                 </p>
               )}
 
+              {/* Category selection warning */}
+              {!selectedCategoryId || selectedCategoryId <= 0 ? (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 text-sm text-amber-600">
+                  Please select a category first to configure variant
+                  attributes.
+                </div>
+              ) : isFetchingCategoryAttrs ? (
+                <div className="text-sm text-muted-foreground">
+                  Loading category attributes...
+                </div>
+              ) : null}
+
               {/* Product variant */}
               <div className="space-y-4">
                 {fields.map((field, index) => (
@@ -655,63 +767,85 @@ const CreateProductPage = () => {
                     {/* Attributes Section */}
                     <div className="">
                       <Label className="text-sm mb-2 block">Attributes</Label>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {attributes.map((attr) => (
-                          <div key={attr.id} className="space-y-2">
-                            <Label className="">{attr.name}</Label>
-                            <Controller
-                              name={`variants.${index}.attributes`}
-                              control={control}
-                              render={({ field: attributeField }) => {
-                                const currentAttr = attributeField.value?.find(
-                                  (a: { attributeId: number }) =>
-                                    a.attributeId === attr.id,
-                                );
-                                return (
-                                  <Select
-                                    value={
-                                      currentAttr
-                                        ? String(currentAttr.valueId)
-                                        : ""
-                                    }
-                                    onValueChange={(val) => {
-                                      const newAttrs = (
-                                        attributeField.value || []
-                                      )?.filter(
-                                        (a: { attributeId: number }) =>
-                                          a.attributeId !== attr.id,
-                                      );
-                                      newAttrs.push({
-                                        attributeId: attr.id,
-                                        valueId: Number(val),
-                                      });
-                                      attributeField.onChange(newAttrs);
-                                    }}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue
-                                        placeholder={`Select ${attr.name}`}
-                                      />
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-white">
-                                      {attributeValues
-                                        ?.filter((av) => av.attributeId === attr.id)
-                                        .map((val) => (
-                                          <SelectItem
-                                            key={val.id}
-                                            value={String(val.id)}
-                                          >
-                                            {val.value}
-                                          </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                  </Select>
-                                );
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
+                      {selectedCategoryId &&
+                      selectedCategoryId > 0 &&
+                      !isFetchingCategoryAttrs &&
+                      filteredAttributes.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No attributes assigned to this category. Assign
+                          attributes in the{" "}
+                          <a
+                            href="/admin/categories"
+                            className="text-accent hover:underline"
+                          >
+                            Categories
+                          </a>{" "}
+                          section.
+                        </p>
+                      ) : (
+                        <div className="grid gap-4 md:grid-cols-2">
+                          {filteredAttributes.map((attr) => (
+                            <div key={attr.id} className="space-y-2">
+                              <Label className="">{attr.name}</Label>
+                              <Controller
+                                name={`variants.${index}.attributes`}
+                                control={control}
+                                render={({ field: attributeField }) => {
+                                  const currentAttr =
+                                    attributeField.value?.find(
+                                      (a: { attributeId: number }) =>
+                                        a.attributeId === attr.id
+                                    );
+                                  return (
+                                    <Select
+                                      value={
+                                        currentAttr
+                                          ? String(currentAttr.valueId)
+                                          : ""
+                                      }
+                                      onValueChange={(val) => {
+                                        const newAttrs = (
+                                          attributeField.value || []
+                                        )?.filter(
+                                          (a: { attributeId: number }) =>
+                                            a.attributeId !== attr.id
+                                        );
+                                        if (Number(val) > 0) {
+                                          newAttrs.push({
+                                            attributeId: attr.id,
+                                            valueId: Number(val),
+                                          });
+                                        }
+                                        attributeField.onChange(newAttrs);
+                                      }}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue
+                                          placeholder={`Select ${attr.name}`}
+                                        />
+                                      </SelectTrigger>
+                                      <SelectContent className="bg-white">
+                                        {filteredAttributeValues
+                                          .filter(
+                                            (av) => av.attributeId === attr.id
+                                          )
+                                          .map((val) => (
+                                            <SelectItem
+                                              key={val.id}
+                                              value={String(val.id)}
+                                            >
+                                              {val.value}
+                                            </SelectItem>
+                                          ))}
+                                      </SelectContent>
+                                    </Select>
+                                  );
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Duplicate variant error */}
