@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useCategories } from "@/hooks/useCategories";
 import { useAttributes } from "@/hooks/useAttributes";
+import { useAttributeValues } from "@/hooks/useAttributeValues";
 import { PageTransition, FadeIn } from "@/components/ui/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +57,7 @@ const CategoriesPage = () => {
   } = useCategories();
 
   const { attributes, isLoading: attributesLoading } = useAttributes();
+  const { getValuesByAttributeId } = useAttributeValues();
 
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -346,7 +348,23 @@ const CategoriesPage = () => {
           };
         }
       > = {};
-      attrs.forEach((ca) => {
+
+      // Process each attribute and fetch values if not included in response
+      for (const ca of attrs) {
+        let attributeValues = ca.attribute?.values || [];
+
+        // If values not included in response, fetch them separately
+        if ((!attributeValues || attributeValues.length === 0) && ca.attribute) {
+          try {
+            attributeValues = await getValuesByAttributeId(ca.attribute.id);
+          } catch (err) {
+            console.error(
+              `Failed to fetch values for attribute ${ca.attribute.id}:`,
+              err
+            );
+          }
+        }
+
         initialAttrs[ca.attributeId] = {
           isVariantSelectable: ca.isVariantSelectable,
           isRequired: ca.isRequired,
@@ -356,19 +374,19 @@ const CategoriesPage = () => {
             ? {
                 id: ca.attribute.id,
                 name: ca.attribute.name,
-                values:
-                  ca.attribute.values?.map((v) => ({
-                    id: v.id,
-                    value: v.value,
-                    attributeId: v.attributeId,
-                    isActive: v.isActive,
-                    isDeleted: v.isDeleted,
-                    deletedAt: v.deletedAt,
-                  })) || [],
+                values: attributeValues.map((v) => ({
+                  id: v.id,
+                  value: v.value,
+                  attributeId: v.attributeId,
+                  isActive: v.isActive,
+                  isDeleted: v.isDeleted,
+                  deletedAt: v.deletedAt,
+                })),
               }
             : undefined,
         };
-      });
+      }
+
       setCategoryAttributes(initialAttrs);
       setInitialCategoryAttributes(initialAttrs);
     } catch (error) {
@@ -382,16 +400,85 @@ const CategoriesPage = () => {
     attributeId: number,
     field: "isVariantSelectable" | "isRequired",
   ) => {
-    setCategoryAttributes((prev) => ({
-      ...prev,
-      [attributeId]: {
-        ...prev[attributeId],
-        [field]: !prev[attributeId]?.[field],
-      },
-    }));
+    setCategoryAttributes((prev) => {
+      // If this is a new attribute assignment, fetch its values
+      if (!prev[attributeId]) {
+        const attribute = attributes.find((a) => a.id === attributeId);
+        if (attribute) {
+          // We'll fetch values asynchronously after setting the initial state
+          getValuesByAttributeId(attributeId)
+            .then((values) => {
+              setCategoryAttributes((prev2) => ({
+                ...prev2,
+                [attributeId]: {
+                  ...prev2[attributeId],
+                  attribute: {
+                    id: attribute.id,
+                    name: attribute.name,
+                    values: values.map((v) => ({
+                      id: v.id,
+                      value: v.value,
+                      attributeId: v.attributeId,
+                      isActive: v.isActive,
+                      isDeleted: v.isDeleted,
+                      deletedAt: v.deletedAt,
+                    })),
+                  },
+                },
+              }));
+            })
+            .catch((err) => {
+              console.error(
+                `Failed to fetch values for attribute ${attributeId}:`,
+                err
+              );
+            });
+        }
+      }
+      return {
+        ...prev,
+        [attributeId]: {
+          ...prev[attributeId],
+          [field]: !prev[attributeId]?.[field],
+        },
+      };
+    });
   };
 
-  const handleManageAttributeValues = (attributeId: number, name: string) => {
+  const handleManageAttributeValues = async (attributeId: number, name: string) => {
+    // Check if values are already loaded for this attribute
+    const currentAttr = categoryAttributes[attributeId];
+    if (
+      currentAttr?.attribute &&
+      (!currentAttr.attribute.values || currentAttr.attribute.values.length === 0)
+    ) {
+      // Fetch values for this attribute
+      try {
+        const values = await getValuesByAttributeId(attributeId);
+        setCategoryAttributes((prev) => ({
+          ...prev,
+          [attributeId]: {
+            ...prev[attributeId],
+            attribute: prev[attributeId]?.attribute
+              ? {
+                  id: prev[attributeId].attribute!.id,
+                  name: prev[attributeId].attribute!.name,
+                  values: values.map((v) => ({
+                    id: v.id,
+                    value: v.value,
+                    attributeId: v.attributeId,
+                    isActive: v.isActive,
+                    isDeleted: v.isDeleted,
+                    deletedAt: v.deletedAt,
+                  })),
+                }
+              : undefined,
+          },
+        }));
+      } catch (err) {
+        console.error(`Failed to fetch values for attribute ${attributeId}:`, err);
+      }
+    }
     setValueSelectionAttribute({ id: attributeId, name });
     setValueSelectionDialogOpen(true);
   };
@@ -754,7 +841,53 @@ const CategoriesPage = () => {
                             <div className="px-3 py-3 flex items-center justify-center">
                               <Select
                                 value={restrictionMode}
-                                onValueChange={(value) => {
+                                onValueChange={async (value) => {
+                                  // Don't allow changing mode if attribute is not assigned
+                                  if (!attrState?.isVariantSelectable && !attrState?.isRequired) {
+                                    return;
+                                  }
+                                  // If switching to SELECTED mode, ensure values are loaded
+                                  if (value === "SELECTED") {
+                                    const currentAttr =
+                                      categoryAttributes[attribute.id];
+                                    if (
+                                      currentAttr?.attribute &&
+                                      (!currentAttr.attribute.values ||
+                                        currentAttr.attribute.values.length === 0)
+                                    ) {
+                                      try {
+                                        const values = await getValuesByAttributeId(
+                                          attribute.id
+                                        );
+                                        setCategoryAttributes((prev) => ({
+                                          ...prev,
+                                          [attribute.id]: {
+                                            ...prev[attribute.id],
+                                            attribute: prev[attribute.id]
+                                              ?.attribute
+                                              ? {
+                                                  id: prev[attribute.id].attribute!.id,
+                                                  name: prev[attribute.id].attribute!.name,
+                                                  values: values.map((v) => ({
+                                                    id: v.id,
+                                                    value: v.value,
+                                                    attributeId: v.attributeId,
+                                                    isActive: v.isActive,
+                                                    isDeleted: v.isDeleted,
+                                                    deletedAt: v.deletedAt,
+                                                  })),
+                                                }
+                                              : undefined,
+                                          },
+                                        }));
+                                      } catch (err) {
+                                        console.error(
+                                          `Failed to fetch values for attribute ${attribute.id}:`,
+                                          err
+                                        );
+                                      }
+                                    }
+                                  }
                                   setCategoryAttributes((prev) => ({
                                     ...prev,
                                     [attribute.id]: {
@@ -766,6 +899,7 @@ const CategoriesPage = () => {
                                     },
                                   }));
                                 }}
+                                disabled={!attrState?.isVariantSelectable && !attrState?.isRequired}
                               >
                                 <SelectTrigger>
                                   <SelectValue placeholder="Mode" />
@@ -796,6 +930,7 @@ const CategoriesPage = () => {
                                       variant="ghost"
                                       size="sm"
                                       className="h-7 px-2 text-xs text-accent hover:text-accent/80 hover:bg-accent/10"
+                                      disabled={!attrState?.isVariantSelectable && !attrState?.isRequired}
                                       onClick={() =>
                                         handleManageAttributeValues(
                                           attribute.id,
@@ -811,6 +946,7 @@ const CategoriesPage = () => {
                                     variant="ghost"
                                     size="sm"
                                     className="h-7 px-2 text-xs text-accent hover:text-accent/80 hover:bg-accent/10"
+                                    disabled={!attrState?.isVariantSelectable && !attrState?.isRequired}
                                     onClick={() =>
                                       handleManageAttributeValues(
                                         attribute.id,
