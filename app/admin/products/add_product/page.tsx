@@ -213,14 +213,21 @@ const CreateProductPage = () => {
     name: "images",
   });
 
-  // Track uploading images with local preview URLs
-  const [uploadingImages, setUploadingImages] = useState<
-    Array<{
-      index: number;
-      localUrl: string;
-      fileName: string;
-    }>
-  >([]);
+// Track uploading images with local preview URLs
+   const [uploadingImages, setUploadingImages] = useState<
+     Array<{
+       index: number;
+       localUrl: string;
+       fileName: string;
+     }>
+   >([]);
+
+  // Refs for scrolling to error sections
+   const variantCardRefs = useRef<(HTMLDivElement | null)[]>([]);
+   const basicInfoRef = useRef<HTMLDivElement>(null);
+
+  // Track expanded variant for UX
+   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   // Handle image file selection - upload to Cloudinary
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -328,7 +335,13 @@ const CreateProductPage = () => {
       }
       setIsFetchingCategoryAttrs(true);
       try {
-        const catAttrs = await fetchCategoryAttributes(catId);
+        const category = categories.find((c) => c.id === catId);
+        const slug = category?.slug;
+        if (!slug) {
+          setCategoryAttributesMap((prev) => ({ ...prev, [catId]: [] }));
+          return;
+        }
+        const catAttrs = await fetchCategoryAttributes(slug);
         const attrIds = catAttrs.map((ca) => ca.attributeId);
         setCategoryAttributesMap((prev) => ({ ...prev, [catId]: attrIds }));
       } catch {
@@ -346,7 +359,7 @@ const CreateProductPage = () => {
     } else {
       setSelectedCategoryId(null);
     }
-  }, [categoryIdValue, fetchCategoryAttributes]);
+  }, [categoryIdValue, fetchCategoryAttributes, categories]);
 
   // Get attribute IDs that belong to the selected category
   const getCategoryAttributeIds = useCallback(
@@ -394,28 +407,46 @@ const CreateProductPage = () => {
     [watch, setValue, selectedCategoryId, categoryAttributesMap]
   );
 
-  // Function to scroll to the first error in the form
-  const scrollToFirstError = useCallback(() => {
-    const variantsErrors = errors.variants;
-    if (variantsErrors && Array.isArray(variantsErrors)) {
-      for (let i = 0; i < variantsErrors.length; i++) {
-        const variantError = variantsErrors[i] as { 
-          price?: { message?: string };
-          stock?: { message?: string };
-          attributes?: { message?: string };
-        } | undefined;
-        if (variantError?.price || variantError?.stock || variantError?.attributes) {
-          variantCardRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "center" });
-          return;
-        }
-      }
-    }
-    if (errors.name || errors.description || errors.categoryId || errors.slug) {
-      basicInfoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }, [errors]);
+// Function to scroll to the first error in the form
+   const scrollToFirstError = useCallback(() => {
+     const variantsErrors = errors.variants;
+     if (variantsErrors && Array.isArray(variantsErrors)) {
+       for (let i = 0; i < variantsErrors.length; i++) {
+         const variantError = variantsErrors[i] as {
+           price?: { message?: string };
+           stock?: { message?: string };
+           attributes?: { message?: string };
+         } | undefined;
+         if (variantError?.price || variantError?.stock || variantError?.attributes) {
+           setExpandedIndex(i);
+           variantCardRefs.current[i]?.scrollIntoView({ behavior: "smooth", block: "center" });
+           return;
+         }
+       }
+     }
+     if (errors.name || errors.description || errors.categoryId || errors.slug) {
+       basicInfoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+     }
+}, [errors, setExpandedIndex]);
 
-  const onSubmit = async (data: ProductFormData) => {
+   // Handle image removal with position reindexing
+   const handleImageRemove = useCallback(
+     (index: number) => {
+       const current = watch("images") || [];
+       const filtered = current?.filter((_, i) => i !== index);
+       setValue(
+         "images",
+         filtered.map((img, i) => ({
+           ...img,
+           position: i,
+         })),
+         { shouldValidate: false }
+       );
+     },
+     [watch, setValue]
+   );
+
+   const onSubmit = async (data: ProductFormData) => {
     try {
       const productData: CreateProductInput = {
         name: data.name,
@@ -680,14 +711,14 @@ const CreateProductPage = () => {
                                 className="text-xs"
                                 disabled={isUploading}
                               />
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeImage(index)}
-                                disabled={isUploading}
-                                className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
-                              >
+<Button
+                                 type="button"
+                                 variant="ghost"
+                                 size="sm"
+                                 onClick={() => handleImageRemove(index)}
+                                 disabled={isUploading}
+                                 className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                               >
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 Remove
                               </Button>

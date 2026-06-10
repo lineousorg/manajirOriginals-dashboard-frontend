@@ -46,6 +46,7 @@ import { Attribute, AttributeValue, ApplicableAttribute } from "@/types/attribut
 import { useState, useEffect } from "react";
 import { generateSKU } from "@/lib/utils/product";
 import { useToast } from "@/hooks/use-toast";
+import { CreateVariantInput } from "@/types/product";
 
 interface VariantCardProps {
   index: number;
