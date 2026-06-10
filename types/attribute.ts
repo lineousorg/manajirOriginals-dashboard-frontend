@@ -86,9 +86,9 @@ export interface AttributeValue {
 }
 
 /**
- * Represents the relationship between a Category and an Attribute.
- * This allows attributes to be scoped to specific categories.
- */
+  * Represents the relationship between a Category and an Attribute.
+  * This allows attributes to be scoped to specific categories.
+  */
 export interface CategoryAttribute {
   /** Unique identifier for the category-attribute relationship */
   id: number;
@@ -96,6 +96,8 @@ export interface CategoryAttribute {
   categoryId: number;
   /** ID of the attribute */
   attributeId: number;
+  /** Display order on the category page (lower values appear first) */
+  sortOrder: number;
   /** Whether this attribute can be used for variant generation */
   isVariantSelectable: boolean;
   /** Whether this attribute is required for products in this category */
@@ -172,11 +174,13 @@ export interface UpdateAttributeValueInput {
 }
 
 /**
- * Input type for assigning an attribute to a category
- */
+  * Input type for assigning an attribute to a category
+  */
 export interface CreateCategoryAttributeInput {
   /** ID of the attribute to assign */
   attributeId: number;
+  /** Display order on the category page (lower values appear first) */
+  sortOrder?: number;
   /** Whether this attribute can be used for variant generation */
   isVariantSelectable?: boolean;
   /** Whether this attribute is required for products in this category */
@@ -188,9 +192,11 @@ export interface CreateCategoryAttributeInput {
 }
 
 /**
- * Input type for updating a category-attribute relationship
- */
+  * Input type for updating a category-attribute relationship
+  */
 export interface UpdateCategoryAttributeInput {
+  /** Display order on the category page (lower values appear first) */
+  sortOrder?: number;
   /** Whether this attribute can be used for variant generation */
   isVariantSelectable?: boolean;
   /** Whether this attribute is required for products in this category */

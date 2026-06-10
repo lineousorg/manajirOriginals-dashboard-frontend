@@ -14,7 +14,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Sonner />
+        <Sonner position="top-center" />
         <AuthProvider>{children}</AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>

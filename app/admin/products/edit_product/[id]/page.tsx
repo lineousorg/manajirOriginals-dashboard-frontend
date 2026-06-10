@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FormSkeleton } from "@/components/ui/skeleton-card";
 import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/components/ui/sonner";
 import { useProduct } from "@/hooks/useProduct";
 import { useCategories } from "@/hooks/useCategories";
 import { useAttributes } from "@/hooks/useAttributes";
@@ -45,7 +45,6 @@ export default function EditProductPage() {
   const { attributes } = useAttributes();
   const { attributeValues } = useAttributeValues();
   const { fetchCategoryAttributes } = useCategoryAttributes();
-  const { toast } = useToast();
 
   const [togglingVariantId, setTogglingVariantId] = useState<number | null>(
     null,
@@ -259,26 +258,21 @@ export default function EditProductPage() {
         setProduct(updatedProduct);
 
         const variant = updatedProduct.variants?.find(
-          (v) => v.id === variantId,
-        );
-        toast({
-          title: variant?.isActive
-            ? "Variant activated"
-            : "Variant deactivated",
-          description: "Variant status updated.",
-        });
-      } catch {
-        toast({
-          title: "Error",
-          description: "Failed to toggle variant status.",
-          variant: "destructive",
-        });
-      } finally {
-        setTogglingVariantId(null);
-      }
-    },
-    [id, setProduct, toast],
-  );
+           (v) => v.id === variantId,
+         );
+         toast.success(
+           variant?.isActive
+             ? "Variant activated"
+             : "Variant deactivated",
+         );
+       } catch {
+         toast.error("Failed to toggle variant status.");
+       } finally {
+         setTogglingVariantId(null);
+       }
+     },
+     [id, setProduct],
+   );
 
   const handleVariantRemove = useCallback(
     async (index: number) => {
@@ -286,26 +280,25 @@ export default function EditProductPage() {
       const variantToDelete = current[index];
 
       // If this variant has an ID, it exists in the backend - mark for deletion
-      // Actual deletion will happen on form submit
-      if (variantToDelete?.id) {
-        // Remove variant from form state (mark for deletion)
-        const updated = current?.filter((_, i) => i !== index);
-        setValue("variants", updated);
+       // Actual deletion will happen on form submit
+       if (variantToDelete?.id) {
+         // Remove variant from form state (mark for deletion)
+         const updated = current?.filter((_, i) => i !== index);
+         setValue("variants", updated);
 
-        toast({
-          title: "Variant marked for deletion",
-          description: "The variant will be removed when you save changes.",
-        });
-      } else {
-        // New variant (not saved yet) - just remove from local form state
-        if (current.length > 1) {
-          const updated = current?.filter((_, i) => i !== index);
-          setValue("variants", updated);
-        }
-      }
-    },
-    [id, watch, setValue, toast],
-  );
+         toast.success("Variant marked for deletion", {
+           description: "The variant will be removed when you save changes.",
+         });
+       } else {
+         // New variant (not saved yet) - just remove from local form state
+         if (current.length > 1) {
+           const updated = current?.filter((_, i) => i !== index);
+           setValue("variants", updated);
+         }
+       }
+     },
+     [id, watch, setValue],
+   );
 
   const handleImageRemove = useCallback(
     async (index: number, imageId?: number, publicId?: string) => {
@@ -326,50 +319,39 @@ export default function EditProductPage() {
           })),
         );
 
-        toast({
-          title: "Image marked for deletion",
-          description: "The image will be removed when you save changes.",
-        });
-      } else {
-        // New image (not saved yet) - just remove from local form state
-        const current = watch("images") || [];
-        const filtered = current?.filter((_, i) => i !== index);
-        setValue(
-          "images",
-          filtered.map((img, i) => ({
-            id: img.id,
-            url: img.url,
-            publicId: img.publicId,
-            altText: img.altText || "",
-            position: i,
-          })),
-        );
-      }
-    },
-    [id, watch, setValue, toast],
-  );
+        toast.success("Image marked for deletion");
+       } else {
+         // New image (not saved yet) - just remove from local form state
+         const current = watch("images") || [];
+         const filtered = current?.filter((_, i) => i !== index);
+         setValue(
+           "images",
+           filtered.map((img, i) => ({
+             id: img.id,
+             url: img.url,
+             publicId: img.publicId,
+             altText: img.altText || "",
+             position: i,
+           })),
+         );
+       }
+     },
+     [id, watch, setValue],
+   );
 
   const onSubmit = useCallback(
     async (data: ProductFormData) => {
       // Validate id is a valid number
-      if (!id || Number.isNaN(id)) {
-        toast({
-          title: "Error",
-          description: "Invalid product ID. Cannot save changes.",
-          variant: "destructive",
-        });
-        return;
-      }
+       if (!id || Number.isNaN(id)) {
+         toast.error("Invalid product ID. Cannot save changes.");
+         return;
+       }
 
-      // Validate form is initialized
-      if (!originalData) {
-        toast({
-          title: "Error",
-          description: "Form not ready. Please wait for data to load.",
-          variant: "destructive",
-        });
-        return;
-      }
+       // Validate form is initialized
+       if (!originalData) {
+         toast.error("Form not ready. Please wait for data to load.");
+         return;
+       }
 
       try {
         // Build update payload with only changed fields
@@ -475,28 +457,22 @@ export default function EditProductPage() {
         }
 
         // Don't send request if nothing changed
-        if (Object.keys(updateFields).length === 0) {
-          toast({
-            title: "No changes",
-            description: "No fields were modified.",
-          });
-          return;
-        }
+         if (Object.keys(updateFields).length === 0) {
+           toast("No changes");
+           return;
+         }
 
-        const updatedProduct = await productsApi.update(
-          id,
-          updateFields as unknown as import("@/types/product").UpdateProductInput,
-        );
-        toast({
-          title: "Product updated",
-          description: `${data.name} has been updated successfully.`,
-        });
+         const updatedProduct = await productsApi.update(
+           id,
+           updateFields as unknown as import("@/types/product").UpdateProductInput,
+         );
+         toast.success(`${data.name} has been updated successfully.`);
 
         // Update originalData with the backend response to capture newly assigned IDs
         // This prevents duplicate image creation on subsequent edits
         setOriginalData((prev) => {
           if (!prev) return prev;
-          const updatedImages = (updatedProduct.images || [])
+          const updatedImages = (updatedProduct?.images || [])
             .filter((img) => img.url?.trim())
             .map((img, index) => ({
               id: img.id,
@@ -507,22 +483,22 @@ export default function EditProductPage() {
             }));
           return {
             ...prev,
-            name: updatedProduct.name,
-            description: updatedProduct.description,
-            productDetailsHtml: updatedProduct.productDetailsHtml,
-            categoryId: updatedProduct.categoryId,
-            isActive: updatedProduct.isActive,
-            variants: updatedProduct.variants
-              .filter((v) => !v.isDeleted)
+            name: updatedProduct?.name,
+            description: updatedProduct?.description,
+            productDetailsHtml: updatedProduct?.productDetailsHtml,
+            categoryId: updatedProduct?.categoryId,
+            isActive: updatedProduct?.isActive,
+            variants: updatedProduct?.variants
+              .filter((v) => !v?.isDeleted)
               .map((v) => ({
-                id: v.id,
-                sku: v.sku,
-                price: v.price,
-                stock: v.stock,
-                discountType: v.discountType ?? null,
-                discountValue: v.discountValue ?? null,
-                discountStart: v.discountStart ?? null,
-                discountEnd: v.discountEnd ?? null,
+                id: v?.id,
+                sku: v?.sku,
+                price: v?.price,
+                stock: v?.stock,
+                discountType: v?.discountType ?? null,
+                discountValue: v?.discountValue ?? null,
+                discountStart: v?.discountStart ?? null,
+                discountEnd: v?.discountEnd ?? null,
               })),
             images: updatedImages,
           };
@@ -531,17 +507,13 @@ export default function EditProductPage() {
         // router.push("/admin/products");
       } catch (err) {
         const errorMessage =
-          (err as { response?: { data?: { message?: string } } })?.response
-            ?.data?.message || "Failed to update product.";
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
-    },
-    [id, toast, originalData],
-  );
+           (err as { response?: { data?: { message?: string } } })?.response
+             ?.data?.message || "Failed to update product.";
+         toast.error(errorMessage);
+       }
+     },
+     [id, originalData],
+   );
 
   const handleVariantAdd = () => {
     const current = watch("variants") || [];
@@ -824,8 +796,7 @@ export default function EditProductPage() {
                     setError={setError}
                     errors={errors}
                     productName={watch("name")}
-                    toast={toast}
-                  />
+                   />
                 ))}
               </div>
             </div>

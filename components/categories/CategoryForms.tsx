@@ -102,6 +102,12 @@ const CategoryForms = ({
       .replace(/^-+|-+$/g, "");
   };
 
+  // Slug validation - must match pattern ^[a-z0-9]+(?:-[a-z0-9]+)*$
+  const validateSlug = (slug: string): boolean => {
+    const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+    return slugPattern.test(slug);
+  };
+
   // Convert file to base64
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -228,7 +234,18 @@ const CategoryForms = ({
                 placeholder="category-slug"
                 value={newSlug}
                 onChange={(e) => onNewSlugChange(e.target.value)}
+                className={
+                  newSlug && !validateSlug(newSlug)
+                    ? "border-destructive"
+                    : ""
+                }
               />
+              {newSlug && !validateSlug(newSlug) && (
+                <p className="text-xs text-destructive">
+                  Slug must be lowercase, hyphen-separated, and contain only
+                  letters and numbers (e.g., electronics, smart-phones)
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="parentCategory">Parent Category (Optional)</Label>

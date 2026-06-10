@@ -22,6 +22,7 @@ export interface Category {
   };
   /** Attributes assigned to this category (optional, fetched separately) */
   categoryAttributes?: CategoryAttribute[];
+  isDeleted: boolean;
 }
 
 export interface CreateCategoryInput {

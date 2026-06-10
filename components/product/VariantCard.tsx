@@ -42,10 +42,14 @@ import {
 } from "@/components/ui/tooltip";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ProductFormData } from "@/lib/schemas/product";
-import { Attribute, AttributeValue, ApplicableAttribute } from "@/types/attribute";
+import {
+  Attribute,
+  AttributeValue,
+  ApplicableAttribute,
+} from "@/types/attribute";
 import { useState, useEffect } from "react";
 import { generateSKU } from "@/lib/utils/product";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/components/ui/sonner";
 import { CreateVariantInput } from "@/types/product";
 
 interface VariantCardProps {
@@ -86,11 +90,6 @@ interface VariantCardProps {
   setError: UseFormSetError<ProductFormData>;
   errors: FieldErrors<ProductFormData>;
   productName?: string;
-  toast: (props: {
-    title: string;
-    description?: string;
-    variant?: "default" | "destructive";
-  }) => void;
 }
 
 export default function VariantCard({
@@ -114,7 +113,6 @@ export default function VariantCard({
   errors,
   productName = "",
 }: VariantCardProps) {
-  const { toast } = useToast();
   // Initialize discount values from backend variant data
   useEffect(() => {
     if (backendVariant?.id) {
@@ -310,22 +308,28 @@ export default function VariantCard({
                 if (applicableAttr) {
                   if (applicableAttr.valueRestrictionMode === "ALL") {
                     // Show all values for this attribute
-                    dropdownValues = attributeValues?.filter(
-                      (av) => av.attributeId === attr.id
-                    ) || [];
-                  } else if (applicableAttr.valueRestrictionMode === "SELECTED") {
+                    dropdownValues =
+                      attributeValues?.filter(
+                        (av) => av.attributeId === attr.id
+                      ) || [];
+                  } else if (
+                    applicableAttr.valueRestrictionMode === "SELECTED"
+                  ) {
                     // Show only the selected value IDs
                     const selectedIds = new Set(applicableAttr.valueIds);
-                    dropdownValues = attributeValues?.filter(
-                      (av) => av.attributeId === attr.id && selectedIds.has(av.id)
-                    ) || [];
+                    dropdownValues =
+                      attributeValues?.filter(
+                        (av) =>
+                          av.attributeId === attr.id && selectedIds.has(av.id)
+                      ) || [];
                   }
                   // NONE: dropdownValues stays empty — dropdown will not be shown
                 } else {
                   // Fallback: show all values if no applicableAttributes config found
-                  dropdownValues = attributeValues?.filter(
-                    (av) => av.attributeId === attr.id
-                  ) || [];
+                  dropdownValues =
+                    attributeValues?.filter(
+                      (av) => av.attributeId === attr.id
+                    ) || [];
                 }
 
                 // For existing variants (backendVariant.id exists), show read-only display
@@ -337,7 +341,8 @@ export default function VariantCard({
                   const backendAttr = backendVariant?.attributes?.find(
                     (a) => a.attributeValue?.attribute?.id === attr.id
                   );
-                  const backendValue = backendAttr?.attributeValue?.value || "N/A";
+                  const backendValue =
+                    backendAttr?.attributeValue?.value || "N/A";
 
                   return (
                     <div key={attr.id} className="space-y-1">
@@ -457,7 +462,7 @@ export default function VariantCard({
             setValue={setValue}
             setError={setError}
             errors={errors}
-            toast={toast}
+            // toast={toast}
           />
         </div>
       )}
@@ -481,7 +486,7 @@ interface DiscountSectionProps {
   setValue: UseFormSetValue<ProductFormData>;
   setError: UseFormSetError<ProductFormData>;
   errors: FieldErrors<ProductFormData>;
-  toast: (props: {
+  toast?: (props: {
     title: string;
     description?: string;
     variant?: "default" | "destructive";
@@ -635,22 +640,12 @@ function DiscountSection({
                     type: "manual",
                     message: "Percentage cannot exceed 100",
                   });
-                  toast({
-                    title: "Invalid Percentage",
-                    description: "Percentage cannot be more than 100",
-                    variant: "destructive",
-                  });
                 }
               } else if (discountType === "FIXED") {
                 if (value > price) {
                   setError(`variants.${index}.discountValue`, {
                     type: "manual",
                     message: `Fixed discount cannot exceed product price (৳${price})`,
-                  });
-                  toast({
-                    title: "Invalid Fixed Discount",
-                    description: `Fixed discount cannot be more than product price (৳${price})`,
-                    variant: "destructive",
                   });
                 }
               }

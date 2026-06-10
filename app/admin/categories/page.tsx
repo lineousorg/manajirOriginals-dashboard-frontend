@@ -6,8 +6,8 @@ import {
   Plus,
   Search,
   FolderTree,
-  Trash2,
-  MoreHorizontal,
+  // Trash2,
+  // MoreHorizontal,
   Tag,
   Info,
   Loader2,
@@ -89,6 +89,7 @@ const CategoriesPage = () => {
     Record<
       number,
       {
+        sortOrder?: number;
         isVariantSelectable: boolean;
         isRequired: boolean;
         valueRestrictionMode?: "ALL" | "SELECTED" | "NONE";
@@ -112,6 +113,7 @@ const CategoriesPage = () => {
     Record<
       number,
       {
+        sortOrder?: number;
         isVariantSelectable: boolean;
         isRequired: boolean;
         valueRestrictionMode?: "ALL" | "SELECTED" | "NONE";
@@ -172,6 +174,32 @@ const CategoriesPage = () => {
         variant: "destructive",
       });
       return;
+    }
+
+    // Validate slug format
+    const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+    if (!slugPattern.test(newSlug)) {
+      toast({
+        title: "Error",
+        description:
+          "Slug must be lowercase, hyphen-separated, and contain only letters and numbers",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate parent category (prevent self-reference and circular references)
+    if (newParentId !== null && newParentId !== undefined) {
+      // Check if parent is soft-deleted
+      const parentCategory = categories.find((c) => c.id === newParentId);
+      if (parentCategory?.isDeleted) {
+        toast({
+          title: "Error",
+          description: "Cannot use a soft-deleted category as parent",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     try {
@@ -330,6 +358,7 @@ const CategoriesPage = () => {
       const initialAttrs: Record<
         number,
         {
+          sortOrder?: number;
           isVariantSelectable: boolean;
           isRequired: boolean;
           valueRestrictionMode?: "ALL" | "SELECTED" | "NONE";
@@ -366,6 +395,7 @@ const CategoriesPage = () => {
         }
 
         initialAttrs[ca.attributeId] = {
+          sortOrder: ca.sortOrder,
           isVariantSelectable: ca.isVariantSelectable,
           isRequired: ca.isRequired,
           valueRestrictionMode: ca.valueRestrictionMode ?? "ALL",
@@ -412,6 +442,7 @@ const CategoriesPage = () => {
                 ...prev2,
                 [attributeId]: {
                   ...prev2[attributeId],
+                  sortOrder: 0,
                   attribute: {
                     id: attribute.id,
                     name: attribute.name,
@@ -491,7 +522,7 @@ const CategoriesPage = () => {
     setIsSavingAttributes(true);
     try {
       const currentAttrs = await getCategoryAttributes(categorySlug);
-      const currentAttrIds = new Set(currentAttrs.map((ca) => ca.attributeId));
+      // const currentAttrIds = new Set(currentAttrs.map((ca) => ca.attributeId));
       const newAttrIds = new Set(Object.keys(categoryAttributes).map(Number));
 
       // Process each attribute in the new state
@@ -500,7 +531,11 @@ const CategoriesPage = () => {
         const initial = initialCategoryAttributes[attrId];
         const input: CreateCategoryAttributeInput = {
           attributeId: attrId,
-          ...settings,
+          sortOrder: settings.sortOrder,
+          isVariantSelectable: settings.isVariantSelectable,
+          isRequired: settings.isRequired,
+          valueRestrictionMode: settings.valueRestrictionMode,
+          valueIds: settings.valueIds,
         };
 
         if (!initial) {
@@ -509,6 +544,7 @@ const CategoriesPage = () => {
         } else {
           // Check if fields changed
           const hasChanged =
+            initial.sortOrder !== settings.sortOrder ||
             initial.isVariantSelectable !== settings.isVariantSelectable ||
             initial.isRequired !== settings.isRequired ||
             initial.valueRestrictionMode !== settings.valueRestrictionMode ||
@@ -518,6 +554,7 @@ const CategoriesPage = () => {
           if (hasChanged) {
             // Update existing - use PATCH
             await updateCategoryAttribute(categorySlug, attrId, {
+              sortOrder: settings.sortOrder,
               isVariantSelectable: settings.isVariantSelectable,
               isRequired: settings.isRequired,
               valueRestrictionMode: settings.valueRestrictionMode,
@@ -680,8 +717,8 @@ const CategoriesPage = () => {
             ) : (
               <div className="space-y-1">
                 {/* ── Header ── */}
-                <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_minmax(0,1fr)] gap-0 rounded-t-lg border border-b-0 border-border/50 bg-muted/40">
-                  <div className="px-4 py-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider text-xs">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_auto_minmax(0,1fr)] gap-0 rounded-t-lg border border-b-0 border-border/50 bg-muted/40">
+                  <div className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     <div className="flex items-center gap-1.5">
                       Attribute
                       <TooltipProvider>
@@ -699,7 +736,24 @@ const CategoriesPage = () => {
                       </TooltipProvider>
                     </div>
                   </div>
-                  <div className="px-3 py-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider text-xs text-center min-w-[80px]">
+                  <div className="px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center min-w-15">
+                    <div className="flex items-center justify-center gap-1.5">
+                      Order
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button className="inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-muted-foreground/20 transition-colors">
+                              <Info className="w-3 h-3 text-muted-foreground" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent variant="info" side="top">
+                            Display order (lower values appear first).
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </div>
+                  <div className="px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center min-w-20">
                     <div className="flex items-center justify-center gap-1.5">
                       Variant
                       <TooltipProvider>
@@ -717,7 +771,7 @@ const CategoriesPage = () => {
                       </TooltipProvider>
                     </div>
                   </div>
-                  <div className="px-3 py-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider text-xs text-center min-w-[80px]">
+                  <div className="px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center min-w-20">
                     <div className="flex items-center justify-center gap-1.5">
                       Required
                       <TooltipProvider>
@@ -735,7 +789,7 @@ const CategoriesPage = () => {
                       </TooltipProvider>
                     </div>
                   </div>
-                  <div className="px-3 py-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider text-xs text-center min-w-[120px]">
+                  <div className="px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center min-w-30">
                     <div className="flex items-center justify-center gap-1.5">
                       Restriction
                       <TooltipProvider>
@@ -753,7 +807,7 @@ const CategoriesPage = () => {
                       </TooltipProvider>
                     </div>
                   </div>
-                  <div className="px-4 py-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider text-xs text-right">
+                  <div className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">
                     Selected Values
                   </div>
                 </div>
@@ -768,22 +822,22 @@ const CategoriesPage = () => {
                         const restrictionMode =
                           attrState?.valueRestrictionMode ?? "ALL";
                         const selectedIds = attrState?.valueIds ?? [];
-                        const attribValues =
-                          attrState?.attribute?.values
-                            ?.filter((v) => !v.isDeleted)
-                            ?.filter((v) => selectedIds.includes(v.id))
-                            ?.filter(
-                              (
-                                v,
-                              ): v is {
-                                id: number;
-                                value: string;
-                                attributeId: number;
-                                isActive: boolean;
-                                isDeleted: boolean;
-                                deletedAt: string | null;
-                              } => Boolean(v),
-                            ) ?? [];
+                        // const attribValues =
+                        //   attrState?.attribute?.values
+                        //     ?.filter((v) => !v.isDeleted)
+                        //     ?.filter((v) => selectedIds.includes(v.id))
+                        //     ?.filter(
+                        //       (
+                        //         v,
+                        //       ): v is {
+                        //         id: number;
+                        //         value: string;
+                        //         attributeId: number;
+                        //         isActive: boolean;
+                        //         isDeleted: boolean;
+                        //         deletedAt: string | null;
+                        //       } => Boolean(v),
+                        //     ) ?? [];
                         const selectedCount = selectedIds.length;
                         const totalActiveValues =
                           attrState?.attribute?.values?.filter(
@@ -793,7 +847,7 @@ const CategoriesPage = () => {
                         return (
                           <motion.div
                             key={attribute.id}
-                            className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_minmax(0,1fr)] gap-0 items-center transition-colors duration-150"
+                            className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_auto_minmax(0,1fr)] gap-0 items-center transition-colors duration-150"
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -10 }}
@@ -801,13 +855,34 @@ const CategoriesPage = () => {
                           >
                             {/* Col-1 · Attribute name */}
                             <div className="px-4 py-3 flex items-center gap-3">
-                              <Tag className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                              <Tag className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                               <span className="text-sm font-medium text-foreground">
                                 {attribute.name}
                               </span>
                             </div>
 
-                            {/* Col-2 · Variant Checkbox */}
+                            {/* Col-2 · Sort Order Input */}
+                            <div className="px-3 py-3 flex items-center justify-center">
+                              <Input
+                                type="number"
+                                min="0"
+                                value={attrState?.sortOrder ?? 0}
+                                onChange={(e) => {
+                                  const newSortOrder = Number(e.target.value);
+                                  setCategoryAttributes((prev) => ({
+                                    ...prev,
+                                    [attribute.id]: {
+                                      ...prev[attribute.id],
+                                      sortOrder: newSortOrder,
+                                    },
+                                  }));
+                                }}
+                                className="w-16 h-8 text-center text-sm"
+                                disabled={!attrState?.isVariantSelectable && !attrState?.isRequired}
+                              />
+                            </div>
+
+                            {/* Col-3 · Variant Checkbox */}
                             <div className="px-3 py-3 flex items-center justify-center ">
                               <Checkbox
                                 id={`variant-${attribute.id}`}
@@ -823,7 +898,7 @@ const CategoriesPage = () => {
                               />
                             </div>
 
-                            {/* Col-3 · Required Checkbox */}
+                            {/* Col-4 · Required Checkbox */}
                             <div className="px-3 py-3 flex items-center justify-center">
                               <Checkbox
                                 id={`required-${attribute.id}`}
@@ -837,7 +912,7 @@ const CategoriesPage = () => {
                               />
                             </div>
 
-                            {/* Col-4 · Restriction Mode */}
+                            {/* Col-5 · Restriction Mode */}
                             <div className="px-3 py-3 flex items-center justify-center">
                               <Select
                                 value={restrictionMode}
@@ -882,9 +957,9 @@ const CategoriesPage = () => {
                                         }));
                                       } catch (err) {
                                         console.error(
-                                          `Failed to fetch values for attribute ${attribute.id}:`,
-                                          err
-                                        );
+                                            `Failed to fetch values for attribute ${attribute.id}:`,
+                                            err
+                                          );
                                       }
                                     }
                                   }
@@ -914,7 +989,7 @@ const CategoriesPage = () => {
                               </Select>
                             </div>
 
-                            {/* Col-5 · Selected Values summary */}
+                            {/* Col-6 · Selected Values summary */}
                             <div className="px-3 py-3 flex items-center justify-end gap-2">
                               {restrictionMode === "SELECTED" ? (
                                 selectedCount > 0 ? (
