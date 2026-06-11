@@ -49,7 +49,6 @@ import {
 } from "@/types/attribute";
 import { useState, useEffect } from "react";
 import { generateSKU } from "@/lib/utils/product";
-import { toast } from "@/components/ui/sonner";
 import { CreateVariantInput } from "@/types/product";
 
 interface VariantCardProps {
@@ -486,11 +485,6 @@ interface DiscountSectionProps {
   setValue: UseFormSetValue<ProductFormData>;
   setError: UseFormSetError<ProductFormData>;
   errors: FieldErrors<ProductFormData>;
-  toast?: (props: {
-    title: string;
-    description?: string;
-    variant?: "default" | "destructive";
-  }) => void;
 }
 
 function DiscountSection({
@@ -502,7 +496,6 @@ function DiscountSection({
   setValue,
   setError,
   errors,
-  toast,
 }: DiscountSectionProps) {
   const [isOpen, setIsOpen] = useState(false);
   const discountType = watch(`variants.${index}.discountType`);

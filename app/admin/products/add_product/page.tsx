@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/components/ui/sonner";
 import { useRouter } from "next/navigation";
 import { CreateProductInput, ProductImage } from "@/types/product";
 import RichTextEditor from "@/components/editor/RichTextEditor";
@@ -153,7 +153,6 @@ const CreateProductPage = () => {
   const { attributeValues, isLoading: isLoadingAttributeValues } =
     useAttributeValues();
   const { fetchCategoryAttributes } = useCategoryAttributes();
-  const { toast } = useToast();
 
   // Track selected category to filter attributes
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
@@ -273,11 +272,7 @@ const CreateProductPage = () => {
         URL.revokeObjectURL(upload.localUrl);
       } catch (error) {
         console.error("Error uploading image to Cloudinary:", error);
-        toast({
-          title: "Upload Failed",
-          description: `Failed to upload ${upload.fileName}. Please try again.`,
-          variant: "destructive",
-        });
+toast.error(`Failed to upload ${upload.fileName}. Please try again.`);
         setUploadingImages((prev) =>
           prev.filter((u) => u.index !== upload.index)
         );
@@ -480,29 +475,17 @@ const CreateProductPage = () => {
 
       const createdProduct = await createProduct(productData);
 
-      toast({
-        title: "Product created",
-        description: `${data.name} has been created successfully.`,
-      });
+toast.success(`${data.name} has been created successfully.`);
       router.push("/admin/products");
     } catch (error: any) {
       console.error("Error creating product:", error);
 
       if (error?.response?.status === 409) {
-        toast({
-          title: "Slug Already Exists",
-          description:
-            "Product with this slug already exists. Please use a different slug.",
-          variant: "destructive",
-        });
+toast.error("Product with this slug already exists. Please use a different slug.");
       } else {
-        toast({
-          title: "Error",
-          description:
-            error?.response?.data?.message ||
-            "Failed to create product. Please try again.",
-          variant: "destructive",
-        });
+toast.error(
+             error?.response?.data?.message || "Failed to create product. Please try again."
+         );
       }
     }
   };
