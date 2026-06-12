@@ -24,11 +24,31 @@ import {
   ProductFormData,
   INITIAL_FORM,
 } from "@/lib/schemas/product";
-import { ProductImage, VariantAttributeForm } from "@/types/product";
+import {
+  ProductImage,
+  ProductSizeChartImage,
+  ProductSizeChartInput,
+  VariantAttributeForm,
+} from "@/types/product";
 import { transformVariantAttributes, generateSKU } from "@/lib/utils/product";
 import VariantCard from "@/components/product/VariantCard";
 import ProductImageGallery from "@/components/product/ProductImageGallery";
+import SizeChartUpload from "@/components/product/SizeChartUpload";
 import RichTextEditor from "@/components/editor/RichTextEditor";
+
+type SizeChartEditState =
+  | {
+      mode: "unchanged";
+    }
+  | {
+      mode: "replace";
+      url: string;
+      publicId: string;
+      altText?: string | null;
+    }
+  | {
+      mode: "remove";
+    };
 
 export default function EditProductPage() {
   const params = useParams<{ id: string }>();
@@ -55,6 +75,9 @@ export default function EditProductPage() {
   const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
   const [initialized, setInitialized] = useState(false);
+  const [sizeChartState, setSizeChartState] = useState<SizeChartEditState>({
+    mode: "unchanged",
+  });
 
   // Refs for scrolling to error sections
   const variantCardRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -83,6 +106,7 @@ export default function EditProductPage() {
       altText: string;
       position: number;
     }>;
+    sizeChartImage?: ProductSizeChartImage | null;
   } | null>(null);
 
   // Filter active variants once - used throughout the component
@@ -92,10 +116,6 @@ export default function EditProductPage() {
   const effectiveCategorySlug = product?.category?.slug ?? "";
   const [categoryAttrIds, setCategoryAttrIds] = useState<number[]>([]);
   const [isFetchingCatAttrs, setIsFetchingCatAttrs] = useState(false);
-
-  // Form ready state - ensures all prerequisites are met before allowing submission
-  const formReady =
-    !Number.isNaN(id) && product && categories.length > 0 && initialized;
 
   // Fetch category-scoped attributes when product category is known
   useEffect(() => {
@@ -136,6 +156,7 @@ export default function EditProductPage() {
     defaultValues: INITIAL_FORM as unknown as ProductFormData,
   });
 
+console.log(errors, isSubmitting);
   // Function to scroll to the first error in the form
   const scrollToFirstError = useCallback(() => {
     const variantsErrors = errors.variants;
@@ -170,8 +191,8 @@ export default function EditProductPage() {
     }
   }, [errors, setExpandedIndex]);
 
-  // Wait for product and categories data before form initialization
-  const isReady = product && categories.length > 0;
+  // Wait for product data before form initialization
+  const isReady = !!product;
 
   // Log category-related variables when product changes (for debugging)
   useEffect(() => {
@@ -212,7 +233,10 @@ export default function EditProductPage() {
           discountStart: v.discountStart ?? null,
           discountEnd: v.discountEnd ?? null,
         })),
-        images: product.images || [],
+        images:
+          product.images
+            ?.filter((img) => img.url?.trim())
+            .filter((img) => !img.type || img.type === "PRODUCT") || [],
       });
       // Store original data for dirty checking
       setOriginalData({
@@ -234,6 +258,7 @@ export default function EditProductPage() {
         images:
           product.images
             ?.filter((img) => img.url?.trim())
+            .filter((img) => !img.type || img.type === "PRODUCT")
             .map((img, index) => ({
               id: img.id,
               url: img.url,
@@ -241,10 +266,11 @@ export default function EditProductPage() {
               altText: img.altText || "",
               position: index,
             })) || [],
+        sizeChartImage: product.sizeChartImage || null,
       });
       setInitialized(true);
     }
-  }, [isReady, product, categories, reset, initialized]);
+  }, [isReady, product, reset, initialized]);
 
   const handleToggleVariantActive = useCallback(
     async (variantId: number) => {
@@ -456,6 +482,18 @@ export default function EditProductPage() {
           updateFields.images = normalizedCurrentImages;
         }
 
+        if (sizeChartState.mode === "replace") {
+          updateFields.sizeChart = {
+            url: sizeChartState.url,
+            publicId: sizeChartState.publicId,
+            altText: sizeChartState.altText || undefined,
+          };
+        }
+
+        if (sizeChartState.mode === "remove") {
+          updateFields.sizeChart = null;
+        }
+
         // Don't send request if nothing changed
          if (Object.keys(updateFields).length === 0) {
            toast("No changes");
@@ -500,11 +538,13 @@ export default function EditProductPage() {
                 discountStart: v?.discountStart ?? null,
                 discountEnd: v?.discountEnd ?? null,
               })),
-            images: updatedImages,
-          };
-        });
-
-        // router.push("/admin/products");
+              images: updatedImages,
+              sizeChartImage: updatedProduct?.sizeChartImage || null,
+            };
+          });
+          setSizeChartState({ mode: "unchanged" });
+  
+          // router.push("/admin/products");
       } catch (err) {
         const errorMessage =
            (err as { response?: { data?: { message?: string } } })?.response
@@ -512,8 +552,8 @@ export default function EditProductPage() {
          toast.error(errorMessage);
        }
      },
-     [id, originalData],
-   );
+    [id, originalData, sizeChartState],
+  );
 
   const handleVariantAdd = () => {
     const current = watch("variants") || [];
@@ -809,7 +849,7 @@ export default function EditProductPage() {
                 images={(watch("images") || []).map((img, idx) => ({
                   id: img.id,
                   url: img.url,
-                  publicId: img.publicId,
+                  publicId: img.publicId || null || undefined,
                   altText: img.altText || "",
                   position:
                     typeof img.position === "number" ? img.position : idx,
@@ -818,6 +858,35 @@ export default function EditProductPage() {
                 onRemove={(idx, imageId, publicId) => {
                   handleImageRemove(idx, imageId, publicId);
                 }}
+              />
+            </div>
+          </FadeIn>
+
+          {/* Size Chart */}
+          <FadeIn delay={0.35}>
+            <div className="bg-card rounded-lg border p-6 shadow-card">
+              <SizeChartUpload
+                mode="edit"
+                existing={product.sizeChartImage || null}
+                removed={sizeChartState.mode === "remove"}
+                value={
+                  sizeChartState.mode === "replace"
+                    ? {
+                        url: sizeChartState.url,
+                        publicId: sizeChartState.publicId,
+                        altText: sizeChartState.altText || null,
+                      }
+                    : null
+                }
+                onUpload={(uploaded: ProductSizeChartInput) =>
+                  setSizeChartState({
+                    mode: "replace",
+                    url: uploaded.url,
+                    publicId: uploaded.publicId,
+                    altText: uploaded.altText || null,
+                  })
+                }
+                onRemove={() => setSizeChartState({ mode: "remove" })}
               />
             </div>
           </FadeIn>
@@ -834,7 +903,7 @@ export default function EditProductPage() {
             <Button
               type="submit"
               className="bg-accent hover:bg-accent/90 text-accent-foreground"
-              disabled={isSubmitting || !formReady}
+              disabled={isSubmitting}
             >
               {isSubmitting ? (
                 <>
@@ -851,3 +920,4 @@ export default function EditProductPage() {
     </PageTransition>
   );
 }
+

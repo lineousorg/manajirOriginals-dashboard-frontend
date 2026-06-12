@@ -6,8 +6,10 @@ import { Plus, Trash2, Loader2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/sonner";
 import { ProductImage } from "@/types/product";
-import { uploadToCloudinary } from "@/lib/utils/cloudinary";
+import { productsApi } from "@/services/api";
+import { validateProductImageFile } from "@/lib/utils/productImageValidation";
 
 interface UploadingImage {
   url: string;
@@ -49,6 +51,14 @@ export default function ProductImageGallery({
     // Create local previews immediately for all selected files
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      const validationError = validateProductImageFile(file);
+
+      if (validationError) {
+        toast.error(validationError);
+        e.target.value = "";
+        return;
+      }
+
       const imageIndex = startIndex + i;
 
       // Create local preview URL
@@ -77,14 +87,15 @@ export default function ProductImageGallery({
       if (!file) continue;
 
       try {
-        const cloudinaryResponse = await uploadToCloudinary(file);
+        const uploaded = await productsApi.uploadProductImage(file);
 
         // Upload successful - add to completed list with publicId
         completedImages.push({
-          url: cloudinaryResponse.secure_url,
-          publicId: cloudinaryResponse.public_id,
+          url: uploaded.url,
+          publicId: uploaded.publicId,
           altText: uploadingImg.altText,
           position: uploadingImg.position,
+          type: "PRODUCT",
         });
       } catch (error) {
         // Upload failed - mark with error

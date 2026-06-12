@@ -15,6 +15,7 @@ import { useCategories } from "@/hooks/useCategories";
 import { Product } from "@/types/product";
 import { PageTransition, FadeIn } from "@/components/ui/motion";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -244,11 +245,20 @@ const ProductsPage = () => {
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
-                              {product.images && product.images?.length > 0 ? (
+                              {product.images &&
+                              product.images.filter(
+                                (img) => !img.type || img.type === "PRODUCT",
+                              ).length > 0 ? (
                                 <img
-                                  src={product.images[0].url}
+                                  src={
+                                    product.images.filter(
+                                      (img) => !img.type || img.type === "PRODUCT",
+                                    )[0].url
+                                  }
                                   alt={
-                                    product.images[0].altText || product.name
+                                    product.images.filter(
+                                      (img) => !img.type || img.type === "PRODUCT",
+                                    )[0].altText || product.name
                                   }
                                   className="w-full h-full object-cover"
                                 />
@@ -261,6 +271,11 @@ const ProductsPage = () => {
                               <p className="text-sm text-muted-foreground truncate max-w-50">
                                 {product.description}
                               </p>
+                              {product.sizeChartImage && (
+                                <Badge variant="secondary" className="mt-1">
+                                  Has Size Chart
+                                </Badge>
+                              )}
                             </div>
                           </div>
                         </TableCell>

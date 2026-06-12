@@ -65,6 +65,7 @@ export interface Product {
   category: ProductCategory;
   variants: ProductVariant[];
   images?: ProductImage[];
+  sizeChartImage?: ProductSizeChartImage | null;
   /** Attributes applicable to this product's category with value restriction rules */
   applicableAttributes?: ApplicableAttribute[];
   createdAt: string;
@@ -72,12 +73,26 @@ export interface Product {
 }
 
 // Input types for creating/updating products
+export interface ProductSizeChartImage {
+  id: number;
+  url: string;
+  publicId: string | null;
+  altText?: string | null;
+}
+
+export interface ProductSizeChartInput {
+  url: string;
+  publicId: string;
+  altText?: string | null;
+}
+
 export interface ProductImage {
   id?: number;
   url: string;
   publicId?: string;
   altText: string;
   position: number;
+  type?: "PRODUCT" | "SIZE_CHART";
 }
 
 export interface CreateProductInput {
@@ -88,6 +103,7 @@ export interface CreateProductInput {
   categoryId: number;
   variants: CreateVariantInput[];
   images?: ProductImage[];
+  sizeChart?: ProductSizeChartInput | null;
 }
 
 export interface CreateVariantInput {

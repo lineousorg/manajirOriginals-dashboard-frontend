@@ -26,10 +26,16 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { useRouter } from "next/navigation";
-import { CreateProductInput, ProductImage } from "@/types/product";
+import {
+  CreateProductInput,
+  ProductImage,
+  ProductSizeChartInput,
+} from "@/types/product";
 import RichTextEditor from "@/components/editor/RichTextEditor";
 import { generateSKU } from "@/lib/utils/product";
-import { uploadToCloudinary } from "@/lib/utils/cloudinary";
+import { validateProductImageFile } from "@/lib/utils/productImageValidation";
+import { productsApi } from "@/services/api";
+import SizeChartUpload from "@/components/product/SizeChartUpload";
 
 // Variant attribute schema
 const attributeSchema = z.object({
@@ -44,6 +50,15 @@ const imageSchema = z.object({
   altText: z.string().optional().default(""),
   position: z.number(),
 });
+
+const sizeChartSchema = z
+  .object({
+    url: z.string().url("Size chart URL is required"),
+    publicId: z.string().min(1, "Size chart public ID is required"),
+    altText: z.string().optional().nullable(),
+  })
+  .optional()
+  .nullable();
 
 // Variant schema matching backend structure
 const today = new Date().toISOString().split("T")[0];
@@ -131,6 +146,7 @@ const productSchema = z
         });
       }),
     images: z.array(imageSchema).optional().default([]),
+    sizeChart: sizeChartSchema,
   })
   .superRefine((data, ctx) => {
     // Validate that variant attributes belong to the selected category
@@ -162,6 +178,9 @@ const CreateProductPage = () => {
     Record<number, number[]>
   >({});
   const [isFetchingCategoryAttrs, setIsFetchingCategoryAttrs] = useState(false);
+  const [sizeChart, setSizeChart] = useState<ProductSizeChartInput | null>(
+    null,
+  );
 
   const {
     register,
@@ -192,6 +211,7 @@ const CreateProductPage = () => {
         },
       ],
       images: [],
+      sizeChart: null,
     },
   });
 
@@ -242,6 +262,14 @@ const CreateProductPage = () => {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      const validationError = validateProductImageFile(file);
+
+      if (validationError) {
+        toast.error(validationError);
+        e.target.value = "";
+        return;
+      }
+
       const imageIndex = currentImages.length + i;
       const localUrl = URL.createObjectURL(file);
 
@@ -257,11 +285,11 @@ const CreateProductPage = () => {
     for (const upload of newUploadingImages) {
       try {
         const file = files[upload.index - currentImages.length];
-        const cloudinaryResponse = await uploadToCloudinary(file);
+        const uploaded = await productsApi.uploadProductImage(file);
 
         appendImage({
-          url: cloudinaryResponse.secure_url,
-          publicId: cloudinaryResponse.public_id,
+          url: uploaded.url,
+          publicId: uploaded.publicId,
           altText: upload.fileName,
           position: upload.index,
         });
@@ -470,7 +498,17 @@ toast.error(`Failed to upload ${upload.fileName}. Please try again.`);
           publicId: img.publicId,
           altText: img.altText,
           position: index,
+          type: "PRODUCT" as const,
         })),
+        ...(sizeChart
+          ? {
+              sizeChart: {
+                url: sizeChart.url,
+                publicId: sizeChart.publicId,
+                altText: sizeChart.altText || undefined,
+              },
+            }
+          : {}),
       };
 
       const createdProduct = await createProduct(productData);
@@ -716,6 +754,18 @@ toast.error(
                         {errors.images.message}
                       </p>
                     )}
+                  </div>
+                </div>
+
+                {/* Size Chart */}
+                <div className="col-span-2">
+                  <Label>Size Chart</Label>
+                  <div className="bg-card rounded-lg border p-4 shadow-card space-y-6">
+                    <SizeChartUpload
+                      mode="create"
+                      value={sizeChart}
+                      onUpload={(uploaded) => setSizeChart(uploaded)}
+                    />
                   </div>
                 </div>
               </div>

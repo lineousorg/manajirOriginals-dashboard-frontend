@@ -64,11 +64,20 @@ export const productSchema = z.object({
     z.object({
       id: z.number().optional(), // Image ID for existing images (edit mode)
       url: z.string().min(1, "Image URL is required"),
-      publicId: z.string().optional(), // Cloudinary public ID for deletion
+      publicId: z.string().optional().nullable(), // Cloudinary public ID for deletion
       altText: z.string().optional(),
       position: z.number(),
+      type: z.enum(["PRODUCT", "SIZE_CHART"]).optional(),
     })
   ).optional(),
+  sizeChart: z
+    .object({
+      url: z.string().url("Size chart URL is required"),
+      publicId: z.string().min(1, "Size chart public ID is required"),
+      altText: z.string().optional().nullable(),
+    })
+    .optional()
+    .nullable(),
 });
 
 export type ProductFormData = z.infer<typeof productSchema>;

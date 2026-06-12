@@ -104,6 +104,11 @@ export interface PaginatedResponse<T> {
   };
 }
 
+export interface ProductUploadResponse {
+  url: string;
+  publicId: string;
+}
+
 export const productsApi = {
   getAll: async (params?: PaginationParams): Promise<PaginatedResponse<Product>> => {
     const response = await api.get("/products", { params });
@@ -116,6 +121,18 @@ export const productsApi = {
   create: async (data: CreateProductInput): Promise<Product> => {
     const response = await api.post("/products", data);
     return response.data.data;
+  },
+  uploadProductImage: async (file: File): Promise<ProductUploadResponse> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await api.post("/upload/product", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    return response.data.data ?? response.data;
   },
   update: async (id: number, data: UpdateProductInput): Promise<Product> => {
     const response = await api.patch(`/products/${id}`, data);
