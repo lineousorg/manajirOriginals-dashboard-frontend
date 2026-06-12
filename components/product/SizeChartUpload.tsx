@@ -1,16 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Loader2, Upload } from "lucide-react";
+import { Loader2, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
 import { productsApi } from "@/services/api";
-import {
-  ProductSizeChartImage,
-  ProductSizeChartInput,
-} from "@/types/product";
+import { ProductSizeChartImage, ProductSizeChartInput } from "@/types/product";
 import { validateProductImageFile } from "@/lib/utils/productImageValidation";
 
 interface SizeChartUploadProps {
@@ -33,7 +30,7 @@ export default function SizeChartUpload({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [localAltText, setLocalAltText] = useState(
-    value?.altText ?? existing?.altText ?? "",
+    value?.altText ?? existing?.altText ?? ""
   );
 
   const displayImageUrl = !removed ? value?.url ?? existing?.url : null;
@@ -45,7 +42,7 @@ export default function SizeChartUpload({
   };
 
   const handleFileChange = async (
-    event: React.ChangeEvent<HTMLInputElement>,
+    event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
 
@@ -96,10 +93,9 @@ export default function SizeChartUpload({
     <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-base font-semibold">Size Chart</h3>
+          <h3 className="text-base font-semibold">Add Size Chart</h3>
           <p className="text-sm text-muted-foreground">
-            Upload one optional image. It will be stored separately from product
-            images.
+            Upload size chart for your product
           </p>
         </div>
 
@@ -116,7 +112,7 @@ export default function SizeChartUpload({
 
           <Button
             type="button"
-            variant="outline"
+            className="cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md inline-flex items-center gap-2"
             onClick={handleUploadClick}
             disabled={isUploading}
           >
@@ -140,7 +136,7 @@ export default function SizeChartUpload({
               onClick={onRemove}
               disabled={isUploading}
             >
-              Remove
+              <Trash2 />
             </Button>
           )}
         </div>
@@ -180,9 +176,7 @@ export default function SizeChartUpload({
                 New size chart will replace the existing one when you save.
               </p>
             ) : (
-              <p className="text-xs text-muted-foreground">
-                Existing size chart. Upload a replacement or remove it.
-              </p>
+              ""
             )}
           </div>
         </div>

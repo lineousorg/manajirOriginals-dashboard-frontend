@@ -147,7 +147,7 @@ export default function ProductImageGallery({
         <h2 className="text-lg font-semibold">Product Images</h2>
         <Label
           htmlFor="image-upload"
-          className="cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md inline-flex items-center gap-2"
+          className="cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-3 rounded-md inline-flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           Add Images
